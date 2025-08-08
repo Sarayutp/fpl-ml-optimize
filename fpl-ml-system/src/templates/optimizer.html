@@ -1,0 +1,485 @@
+{% extends "base.html" %}
+
+{% block title %}Team Optimizer - FPL AI Optimizer{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <!-- Header Section -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">ตัวปรับทีมอัตโนมัติ</h1>
+        <p class="text-gray-600">ใช้ AI เพื่อหาทีมที่เหมาะสมที่สุดตามงบประมาณและเงื่อนไขที่คุณกำหนด</p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Optimization Form -->
+        <div class="lg:col-span-1">
+            <div class="bg-white shadow-lg rounded-lg p-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-6">ตั้งค่าการปรับทีม</h2>
+                
+                <form id="optimizeForm" class="space-y-6">
+                    <!-- Budget -->
+                    <div>
+                        <label for="budget" class="block text-sm font-medium text-gray-700 mb-2">
+                            งบประมาณ (ล้านปอนด์)
+                        </label>
+                        <input type="number" 
+                               id="budget" 
+                               name="budget" 
+                               min="50" 
+                               max="100" 
+                               step="0.1" 
+                               value="100.0"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+
+                    <!-- Formation -->
+                    <div>
+                        <label for="formation" class="block text-sm font-medium text-gray-700 mb-2">
+                            ฟอร์มเมชัน (เลือกได้)
+                        </label>
+                        <select id="formation" 
+                                name="formation" 
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">อัตโนมัติ (แนะนำ)</option>
+                            <option value="3-4-3">3-4-3</option>
+                            <option value="3-5-2">3-5-2</option>
+                            <option value="4-3-3">4-3-3</option>
+                            <option value="4-4-2">4-4-2</option>
+                            <option value="4-5-1">4-5-1</option>
+                            <option value="5-3-2">5-3-2</option>
+                            <option value="5-4-1">5-4-1</option>
+                        </select>
+                    </div>
+
+                    <!-- Max Players Per Team -->
+                    <div>
+                        <label for="maxPlayersPerTeam" class="block text-sm font-medium text-gray-700 mb-2">
+                            ผู้เล่นสูงสุดต่อทีม
+                        </label>
+                        <select id="maxPlayersPerTeam" 
+                                name="max_players_per_team" 
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            <option value="1">1 คน</option>
+                            <option value="2">2 คน</option>
+                            <option value="3" selected>3 คน</option>
+                            <option value="4">4 คน</option>
+                            <option value="5">5 คน</option>
+                        </select>
+                    </div>
+
+                    <!-- Preferred Players -->
+                    <div>
+                        <label for="preferredPlayers" class="block text-sm font-medium text-gray-700 mb-2">
+                            ผู้เล่นที่ต้องการ (เลือกได้)
+                        </label>
+                        <input type="text" 
+                               id="preferredPlayers" 
+                               name="preferred_players" 
+                               placeholder="พิมพ์ชื่อผู้เล่น เช่น Salah, Haaland"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <p class="text-xs text-gray-500 mt-1">คั่นด้วยเครื่องหมายจุลภาค</p>
+                    </div>
+
+                    <!-- Excluded Players -->
+                    <div>
+                        <label for="excludedPlayers" class="block text-sm font-medium text-gray-700 mb-2">
+                            ผู้เล่นที่ไม่ต้องการ (เลือกได้)
+                        </label>
+                        <input type="text" 
+                               id="excludedPlayers" 
+                               name="excluded_players" 
+                               placeholder="พิมพ์ชื่อผู้เล่นที่ต้องการแยกออก"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <p class="text-xs text-gray-500 mt-1">คั่นด้วยเครื่องหมายจุลภาค</p>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <button type="submit" 
+                            id="optimizeBtn"
+                            class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors">
+                        <span id="optimizeBtnText">ปรับทีมอัตโนมัติ</span>
+                        <span id="optimizeSpinner" class="hidden">
+                            <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            กำลังปรับทีม...
+                        </span>
+                    </button>
+                </form>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="bg-white shadow-lg rounded-lg p-6 mt-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">การกระทำด่วน</h3>
+                <div class="space-y-3">
+                    <button id="resetFormBtn" class="w-full text-left px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-md transition-colors">
+                        🔄 รีเซ็ตฟอร์ม
+                    </button>
+                    <button id="saveConfigBtn" class="w-full text-left px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-md transition-colors">
+                        💾 บันทึกการตั้งค่า
+                    </button>
+                    <button id="loadConfigBtn" class="w-full text-left px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-md transition-colors">
+                        📁 โหลดการตั้งค่า
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div class="lg:col-span-2">
+            <!-- Loading State -->
+            <div id="loadingState" class="hidden bg-white shadow-lg rounded-lg p-8 text-center">
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p class="text-gray-600">กำลังประมวลผลทีมที่ดีที่สุดสำหรับคุณ...</p>
+                <p class="text-sm text-gray-500 mt-2">อาจใช้เวลาประมาณ 10-30 วินาที</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="errorState" class="hidden bg-red-50 border border-red-200 rounded-lg p-6">
+                <div class="flex items-center mb-2">
+                    <svg class="h-5 w-5 text-red-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+                    </svg>
+                    <h3 class="text-lg font-medium text-red-800">เกิดข้อผิดพลาด</h3>
+                </div>
+                <p id="errorMessage" class="text-red-700"></p>
+                <button id="retryBtn" class="mt-4 bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors">
+                    ลองอีกครั้ง
+                </button>
+            </div>
+
+            <!-- Results Display -->
+            <div id="resultsDisplay" class="hidden space-y-6">
+                <!-- Team Summary -->
+                <div class="bg-white shadow-lg rounded-lg p-6">
+                    <div class="flex justify-between items-start mb-6">
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-900">ทีมที่แนะนำ</h2>
+                            <div class="flex items-center space-x-4 mt-2">
+                                <span class="text-sm text-gray-600">คะแนนคาดหวัง: <span id="expectedPoints" class="font-semibold text-green-600"></span></span>
+                                <span class="text-sm text-gray-600">ราคารวม: <span id="totalCost" class="font-semibold text-blue-600"></span>M</span>
+                                <span class="text-sm text-gray-600">เงินเหลือ: <span id="remainingBudget" class="font-semibold text-gray-800"></span>M</span>
+                            </div>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button id="exportTeamBtn" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors text-sm">
+                                📤 ส่งออก
+                            </button>
+                            <button id="compareTeamBtn" class="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-colors text-sm">
+                                ⚖️ เปรียบเทียบ
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Formation Display -->
+                    <div id="formationDisplay" class="mb-6">
+                        <!-- Formation will be dynamically generated here -->
+                    </div>
+
+                    <!-- Captain Selection -->
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+                        <h3 class="font-semibold text-gray-900 mb-2">🔥 การเลือกกัปตัน</h3>
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-700">กัปตัน: <span id="captainName" class="font-semibold"></span></p>
+                                <p class="text-sm text-gray-700">รองกัปตัน: <span id="viceCaptainName" class="font-semibold"></span></p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-xs text-gray-500">คะแนนคาดหวังรวม</p>
+                                <p class="text-lg font-bold text-yellow-600" id="captainPoints"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AI Reasoning -->
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <h3 class="font-semibold text-gray-900 mb-2">🤖 เหตุผลจาก AI</h3>
+                        <p id="reasoningText" class="text-sm text-gray-700 leading-relaxed"></p>
+                    </div>
+                </div>
+
+                <!-- Detailed Player List -->
+                <div class="bg-white shadow-lg rounded-lg p-6">
+                    <h3 class="text-xl font-semibold text-gray-900 mb-4">รายละเอียดผู้เล่น</h3>
+                    
+                    <!-- Position Tabs -->
+                    <div class="border-b border-gray-200 mb-4">
+                        <nav class="-mb-px flex space-x-8">
+                            <button class="position-tab py-2 px-1 border-b-2 font-medium text-sm" data-position="GKP">
+                                ผู้รักษาประตู
+                            </button>
+                            <button class="position-tab py-2 px-1 border-b-2 font-medium text-sm" data-position="DEF">
+                                กองหลัง
+                            </button>
+                            <button class="position-tab py-2 px-1 border-b-2 font-medium text-sm" data-position="MID">
+                                กองกลาง
+                            </button>
+                            <button class="position-tab py-2 px-1 border-b-2 font-medium text-sm" data-position="FWD">
+                                กองหน้า
+                            </button>
+                        </nav>
+                    </div>
+
+                    <!-- Player Lists -->
+                    <div id="playerLists">
+                        <!-- Will be populated dynamically -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Default State -->
+            <div id="defaultState" class="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-12 text-center">
+                <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 00-2-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                <h3 class="text-lg font-medium text-gray-900 mb-2">เริ่มต้นปรับทีม</h3>
+                <p class="text-gray-500 mb-4">กรอกข้อมูลในฟอร์มด้านซ้ายและกดปุ่ม "ปรับทีมอัตโนมัติ" เพื่อเริ่มต้น</p>
+                <p class="text-sm text-gray-400">AI จะช่วยหาทีมที่เหมาะสมที่สุดตามเงื่อนไขที่คุณตั้งไว้</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('optimizeForm');
+    const optimizeBtn = document.getElementById('optimizeBtn');
+    const optimizeBtnText = document.getElementById('optimizeBtnText');
+    const optimizeSpinner = document.getElementById('optimizeSpinner');
+    
+    // State elements
+    const defaultState = document.getElementById('defaultState');
+    const loadingState = document.getElementById('loadingState');
+    const errorState = document.getElementById('errorState');
+    const resultsDisplay = document.getElementById('resultsDisplay');
+    const errorMessage = document.getElementById('errorMessage');
+
+    // Form submission
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        // Show loading state
+        showState('loading');
+        setButtonLoading(true);
+        
+        try {
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData.entries());
+            
+            // Convert comma-separated strings to arrays
+            if (data.preferred_players) {
+                data.preferred_players = data.preferred_players.split(',').map(s => s.trim()).filter(s => s);
+            }
+            if (data.excluded_players) {
+                data.excluded_players = data.excluded_players.split(',').map(s => s.trim()).filter(s => s);
+            }
+            
+            const response = await fetch('/api/optimize', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                displayResults(result.data);
+                showState('results');
+            } else {
+                throw new Error(result.error || 'เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ');
+            }
+            
+        } catch (error) {
+            console.error('Optimization error:', error);
+            errorMessage.textContent = error.message;
+            showState('error');
+        } finally {
+            setButtonLoading(false);
+        }
+    });
+
+    // Retry button
+    document.getElementById('retryBtn').addEventListener('click', function() {
+        form.dispatchEvent(new Event('submit'));
+    });
+
+    // Quick action buttons
+    document.getElementById('resetFormBtn').addEventListener('click', function() {
+        form.reset();
+        showState('default');
+    });
+
+    // Helper functions
+    function showState(state) {
+        [defaultState, loadingState, errorState, resultsDisplay].forEach(el => el.classList.add('hidden'));
+        
+        switch(state) {
+            case 'loading':
+                loadingState.classList.remove('hidden');
+                break;
+            case 'error':
+                errorState.classList.remove('hidden');
+                break;
+            case 'results':
+                resultsDisplay.classList.remove('hidden');
+                break;
+            default:
+                defaultState.classList.remove('hidden');
+        }
+    }
+
+    function setButtonLoading(loading) {
+        if (loading) {
+            optimizeBtnText.classList.add('hidden');
+            optimizeSpinner.classList.remove('hidden');
+            optimizeBtn.disabled = true;
+        } else {
+            optimizeBtnText.classList.remove('hidden');
+            optimizeSpinner.classList.add('hidden');
+            optimizeBtn.disabled = false;
+        }
+    }
+
+    function displayResults(data) {
+        // Update summary
+        document.getElementById('expectedPoints').textContent = data.expected_points.toFixed(1);
+        document.getElementById('totalCost').textContent = data.total_cost.toFixed(1);
+        document.getElementById('remainingBudget').textContent = (100.0 - data.total_cost).toFixed(1);
+        
+        // Update captain info
+        document.getElementById('captainName').textContent = data.captain_name || 'N/A';
+        document.getElementById('viceCaptainName').textContent = data.vice_captain_name || 'N/A';
+        document.getElementById('captainPoints').textContent = (data.captain_expected_points || 0).toFixed(1);
+        
+        // Update reasoning
+        document.getElementById('reasoningText').textContent = data.reasoning || 'ไม่มีคำอธิบาย';
+        
+        // Generate formation display
+        generateFormationDisplay(data.players_by_position);
+        
+        // Generate player lists
+        generatePlayerLists(data.players_by_position);
+        
+        // Initialize position tabs
+        initPositionTabs();
+    }
+
+    function generateFormationDisplay(playersByPosition) {
+        const formationDisplay = document.getElementById('formationDisplay');
+        const positions = ['GKP', 'DEF', 'MID', 'FWD'];
+        
+        let html = '<div class="grid grid-cols-4 gap-4 text-center">';
+        
+        positions.forEach(position => {
+            const players = playersByPosition[position] || [];
+            const count = players.length;
+            
+            html += `
+                <div class="bg-gray-50 rounded-lg p-3">
+                    <div class="text-xs text-gray-500 mb-1">${getPositionName(position)}</div>
+                    <div class="text-2xl font-bold text-blue-600">${count}</div>
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+        formationDisplay.innerHTML = html;
+    }
+
+    function generatePlayerLists(playersByPosition) {
+        const playerLists = document.getElementById('playerLists');
+        const positions = ['GKP', 'DEF', 'MID', 'FWD'];
+        
+        let html = '';
+        
+        positions.forEach((position, index) => {
+            const players = playersByPosition[position] || [];
+            const isActive = index === 0 ? 'block' : 'hidden';
+            
+            html += `
+                <div class="position-content ${isActive}" data-position="${position}">
+                    <div class="space-y-3">
+            `;
+            
+            players.forEach(player => {
+                html += `
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div class="flex-1">
+                            <div class="flex items-center">
+                                <span class="font-semibold text-gray-900">${player.web_name}</span>
+                                <span class="ml-2 text-sm text-gray-500">(${player.team_name})</span>
+                                ${player.is_captain ? '<span class="ml-2 text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">กัปตัน</span>' : ''}
+                                ${player.is_vice_captain ? '<span class="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">รองกัปตัน</span>' : ''}
+                            </div>
+                            <div class="text-sm text-gray-500 mt-1">
+                                คะแนนคาดหวัง: ${player.expected_points.toFixed(1)} | 
+                                ฟอร์ม: ${player.form.toFixed(1)}
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-semibold text-blue-600">£${player.now_cost.toFixed(1)}M</div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div></div>';
+        });
+        
+        playerLists.innerHTML = html;
+    }
+
+    function initPositionTabs() {
+        const tabs = document.querySelectorAll('.position-tab');
+        const contents = document.querySelectorAll('.position-content');
+        
+        tabs.forEach(tab => {
+            tab.addEventListener('click', function() {
+                const position = this.dataset.position;
+                
+                // Update tab styles
+                tabs.forEach(t => {
+                    t.classList.remove('border-blue-500', 'text-blue-600');
+                    t.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+                });
+                
+                this.classList.remove('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+                this.classList.add('border-blue-500', 'text-blue-600');
+                
+                // Show corresponding content
+                contents.forEach(content => {
+                    if (content.dataset.position === position) {
+                        content.classList.remove('hidden');
+                        content.classList.add('block');
+                    } else {
+                        content.classList.remove('block');
+                        content.classList.add('hidden');
+                    }
+                });
+            });
+        });
+        
+        // Activate first tab
+        if (tabs.length > 0) {
+            tabs[0].click();
+        }
+    }
+
+    function getPositionName(position) {
+        const names = {
+            'GKP': 'ผู้รักษาประตู',
+            'DEF': 'กองหลัง', 
+            'MID': 'กองกลาง',
+            'FWD': 'กองหน้า'
+        };
+        return names[position] || position;
+    }
+
+    // Initialize with default state
+    showState('default');
+});
+</script>
+{% endblock %}

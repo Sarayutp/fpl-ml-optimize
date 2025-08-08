@@ -1,0 +1,8 @@
+Collecting xgboost
+  Downloading xgboost-3.0.3-py3-none-macosx_12_0_arm64.whl.metadata (2.1 kB)
+Requirement already satisfied: numpy in ./venv/lib/python3.12/site-packages (from xgboost) (1.26.4)
+Requirement already satisfied: scipy in ./venv/lib/python3.12/site-packages (from xgboost) (1.16.1)
+Downloading xgboost-3.0.3-py3-none-macosx_12_0_arm64.whl (2.0 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.0/2.0 MB 4.3 MB/s  0:00:00
+Installing collected packages: xgboost
+Successfully installed xgboost-3.0.3

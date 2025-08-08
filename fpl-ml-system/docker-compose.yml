@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  # Main FPL AI Optimizer application
+  fpl-optimizer:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+      - DATABASE_URL=sqlite:///data/fpl.db
+      - FPL_API_BASE_URL=https://fantasy.premierleague.com/api/
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
+      - CACHE_TTL=${CACHE_TTL:-3600}
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./models:/app/models
+    depends_on:
+      - redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Redis for caching
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Nginx reverse proxy (optional for production)
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - fpl-optimizer
+    restart: unless-stopped
+    profiles:
+      - production
+
+  # Database backup service (optional)
+  backup:
+    image: alpine:latest
+    volumes:
+      - ./data:/data
+      - ./backups:/backups
+    command: >
+      sh -c "
+        while true; do
+          echo 'Creating backup at $(date)'
+          tar -czf /backups/fpl-backup-$(date +%Y%m%d-%H%M%S).tar.gz /data
+          # Keep only last 7 backups
+          ls -t /backups/fpl-backup-*.tar.gz | tail -n +8 | xargs -r rm
+          sleep 86400  # 24 hours
+        done
+      "
+    restart: unless-stopped
+    profiles:
+      - production
+
+volumes:
+  redis_data:
+
+networks:
+  default:
+    name: fpl-optimizer-network

@@ -1,0 +1,618 @@
+{% extends "base.html" %}
+
+{% block title %}Player Scouting - FPL AI Optimizer{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <!-- Header Section -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">ระบบสืบค้นผู้เล่น</h1>
+        <p class="text-gray-600">ค้นหาและเปรียบเทียบผู้เล่นด้วยข้อมูลสถิติที่ละเอียดและการพยากรณ์จาก AI</p>
+    </div>
+
+    <!-- Search and Filters -->
+    <div class="bg-white shadow-lg rounded-lg p-6 mb-8">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <!-- Search by Name -->
+            <div>
+                <label for="playerSearch" class="block text-sm font-medium text-gray-700 mb-2">
+                    ชื่อผู้เล่น
+                </label>
+                <input type="text" 
+                       id="playerSearch" 
+                       placeholder="พิมพ์ชื่อผู้เล่น..."
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+
+            <!-- Position Filter -->
+            <div>
+                <label for="positionFilter" class="block text-sm font-medium text-gray-700 mb-2">
+                    ตำแหน่ง
+                </label>
+                <select id="positionFilter" 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">ทั้งหมด</option>
+                    <option value="GKP">ผู้รักษาประตู</option>
+                    <option value="DEF">กองหลัง</option>
+                    <option value="MID">กองกลาง</option>
+                    <option value="FWD">กองหน้า</option>
+                </select>
+            </div>
+
+            <!-- Team Filter -->
+            <div>
+                <label for="teamFilter" class="block text-sm font-medium text-gray-700 mb-2">
+                    ทีม
+                </label>
+                <select id="teamFilter" 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">ทั้งหมด</option>
+                    <!-- Will be populated dynamically -->
+                </select>
+            </div>
+
+            <!-- Sort By -->
+            <div>
+                <label for="sortBy" class="block text-sm font-medium text-gray-700 mb-2">
+                    เรียงตาม
+                </label>
+                <select id="sortBy" 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="expected_points">คะแนนคาดหวัง</option>
+                    <option value="total_points">คะแนนรวม</option>
+                    <option value="form">ฟอร์มการเล่น</option>
+                    <option value="now_cost">ราคา</option>
+                    <option value="web_name">ชื่อ</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Price Range -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div>
+                <label for="minPrice" class="block text-sm font-medium text-gray-700 mb-2">
+                    ราคาขั้นต่ำ (£M)
+                </label>
+                <input type="number" 
+                       id="minPrice" 
+                       min="0" 
+                       max="20" 
+                       step="0.1"
+                       placeholder="0.0"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            <div>
+                <label for="maxPrice" class="block text-sm font-medium text-gray-700 mb-2">
+                    ราคาสูงสุด (£M)
+                </label>
+                <input type="number" 
+                       id="maxPrice" 
+                       min="0" 
+                       max="20" 
+                       step="0.1"
+                       placeholder="20.0"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex justify-between items-center">
+            <div class="flex space-x-3">
+                <button id="searchBtn" 
+                        class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors">
+                    🔍 ค้นหา
+                </button>
+                <button id="clearFiltersBtn" 
+                        class="bg-gray-500 text-white px-6 py-2 rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors">
+                    ล้างตัวกรอง
+                </button>
+            </div>
+            <div class="flex items-center space-x-3">
+                <label for="viewMode" class="text-sm font-medium text-gray-700">มุมมอง:</label>
+                <select id="viewMode" 
+                        class="px-3 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm">
+                    <option value="card">การ์ด</option>
+                    <option value="table">ตาราง</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results Section -->
+    <div class="space-y-6">
+        <!-- Results Header -->
+        <div id="resultsHeader" class="hidden bg-gray-50 px-6 py-4 rounded-lg">
+            <div class="flex justify-between items-center">
+                <div>
+                    <span class="text-sm text-gray-600">พบ <span id="totalResults" class="font-semibold">0</span> ผู้เล่น</span>
+                    <span class="ml-4 text-sm text-gray-500">แสดงผล <span id="currentResults">0</span> คน</span>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <button id="exportResultsBtn" 
+                            class="text-sm bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 transition-colors">
+                        📤 ส่งออก
+                    </button>
+                    <button id="compareSelectedBtn" 
+                            class="text-sm bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700 transition-colors">
+                        ⚖️ เปรียบเทียบ (<span id="selectedCount">0</span>)
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="hidden text-center py-12">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p class="text-gray-600">กำลังค้นหาผู้เล่น...</p>
+        </div>
+
+        <!-- Error State -->
+        <div id="errorState" class="hidden bg-red-50 border border-red-200 rounded-lg p-6">
+            <div class="flex items-center">
+                <svg class="h-5 w-5 text-red-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+                </svg>
+                <span class="text-red-800">เกิดข้อผิดพลาด: <span id="errorMessage"></span></span>
+            </div>
+        </div>
+
+        <!-- Card View -->
+        <div id="cardView" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <!-- Player cards will be dynamically inserted here -->
+        </div>
+
+        <!-- Table View -->
+        <div id="tableView" class="hidden bg-white shadow-lg rounded-lg overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <input type="checkbox" id="selectAllCheckbox" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ผู้เล่น</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ตำแหน่ง</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ทีม</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ราคา</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">คะแนนรวม</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ฟอร์ม</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">คะแนนคาดหวัง</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">การกระทำ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody" class="bg-white divide-y divide-gray-200">
+                        <!-- Table rows will be dynamically inserted here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        <div id="pagination" class="hidden flex items-center justify-between bg-white px-6 py-3 rounded-lg shadow">
+            <div class="flex items-center">
+                <span class="text-sm text-gray-700">แสดง</span>
+                <select id="pageSize" class="mx-2 px-2 py-1 border border-gray-300 rounded text-sm">
+                    <option value="20">20</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+                <span class="text-sm text-gray-700">รายการต่อหน้า</span>
+            </div>
+            
+            <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+                <button id="prevPage" 
+                        class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                    ก่อนหน้า
+                </button>
+                <div id="pageNumbers" class="hidden md:flex">
+                    <!-- Page numbers will be inserted here -->
+                </div>
+                <button id="nextPage" 
+                        class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                    ถัดไป
+                </button>
+            </nav>
+            
+            <div class="text-sm text-gray-700">
+                หน้า <span id="currentPage">1</span> จาก <span id="totalPages">1</span>
+            </div>
+        </div>
+
+        <!-- No Results -->
+        <div id="noResults" class="hidden text-center py-12 bg-gray-50 rounded-lg">
+            <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 0112 20.4a7.962 7.962 0 01-6-2.736L3.291 20.3a1 1 0 01-1.414-1.414L4.586 16.172A7.962 7.962 0 013 12c0-4.418 3.582-8 8-8s8 3.582 8 8a7.962 7.962 0 01-2.291 5.664l2.709 2.709a1 1 0 01-1.414 1.414l-2.709-2.709z" />
+            </svg>
+            <h3 class="text-lg font-medium text-gray-900 mb-2">ไม่พบผู้เล่นที่ตรงกับเงื่อนไข</h3>
+            <p class="text-gray-500">ลองปรับเปลี่ยนตัวกรองการค้นหาของคุณ</p>
+        </div>
+
+        <!-- Default State -->
+        <div id="defaultState" class="text-center py-12 bg-gray-50 rounded-lg">
+            <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <h3 class="text-lg font-medium text-gray-900 mb-2">เริ่มต้นการค้นหา</h3>
+            <p class="text-gray-500 mb-4">ใช้ตัวกรองด้านบนเพื่อค้นหาผู้เล่นที่คุณต้องการ</p>
+            <button onclick="document.getElementById('searchBtn').click()" 
+                    class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors">
+                ดูผู้เล่นทั้งหมด
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Player Comparison Modal -->
+<div id="comparisonModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
+    <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-6xl shadow-lg rounded-md bg-white">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-lg font-bold text-gray-900">เปรียบเทียบผู้เล่น</h3>
+            <button id="closeComparisonModal" class="text-gray-400 hover:text-gray-600">
+                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+        <div id="comparisonContent">
+            <!-- Comparison content will be loaded here -->
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // State variables
+    let currentData = [];
+    let selectedPlayers = new Set();
+    let currentPage = 1;
+    let pageSize = 20;
+    let totalPages = 1;
+
+    // DOM elements
+    const searchBtn = document.getElementById('searchBtn');
+    const clearFiltersBtn = document.getElementById('clearFiltersBtn');
+    const viewModeSelect = document.getElementById('viewMode');
+    const cardView = document.getElementById('cardView');
+    const tableView = document.getElementById('tableView');
+    
+    // State elements
+    const loadingState = document.getElementById('loadingState');
+    const errorState = document.getElementById('errorState');
+    const defaultState = document.getElementById('defaultState');
+    const noResults = document.getElementById('noResults');
+    const resultsHeader = document.getElementById('resultsHeader');
+    const pagination = document.getElementById('pagination');
+
+    // Initialize
+    loadTeamOptions();
+    
+    // Event listeners
+    searchBtn.addEventListener('click', performSearch);
+    clearFiltersBtn.addEventListener('click', clearAllFilters);
+    viewModeSelect.addEventListener('change', toggleViewMode);
+
+    // Auto-search on Enter key
+    document.getElementById('playerSearch').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            performSearch();
+        }
+    });
+
+    // Functions
+    async function loadTeamOptions() {
+        try {
+            const response = await fetch('/api/teams');
+            const result = await response.json();
+            
+            if (result.success) {
+                const teamSelect = document.getElementById('teamFilter');
+                result.data.forEach(team => {
+                    const option = document.createElement('option');
+                    option.value = team.team_id;
+                    option.textContent = `${team.name} (${team.short_name})`;
+                    teamSelect.appendChild(option);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading teams:', error);
+        }
+    }
+
+    async function performSearch() {
+        showState('loading');
+        
+        try {
+            const searchParams = {
+                name: document.getElementById('playerSearch').value.trim(),
+                position: document.getElementById('positionFilter').value,
+                team_id: document.getElementById('teamFilter').value ? parseInt(document.getElementById('teamFilter').value) : null,
+                min_cost: document.getElementById('minPrice').value ? parseFloat(document.getElementById('minPrice').value) : null,
+                max_cost: document.getElementById('maxPrice').value ? parseFloat(document.getElementById('maxPrice').value) : null,
+                sort_by: document.getElementById('sortBy').value,
+                sort_order: 'desc',
+                limit: 1000 // Load all for client-side pagination
+            };
+
+            // Remove null values
+            Object.keys(searchParams).forEach(key => {
+                if (searchParams[key] === null || searchParams[key] === '') {
+                    delete searchParams[key];
+                }
+            });
+
+            const queryString = new URLSearchParams(searchParams).toString();
+            const response = await fetch(`/api/players/search?${queryString}`);
+            const result = await response.json();
+
+            if (result.success) {
+                currentData = result.data.players;
+                updateResultsDisplay();
+                
+                if (currentData.length === 0) {
+                    showState('noResults');
+                } else {
+                    showState('results');
+                }
+            } else {
+                throw new Error(result.error || 'Search failed');
+            }
+        } catch (error) {
+            console.error('Search error:', error);
+            document.getElementById('errorMessage').textContent = error.message;
+            showState('error');
+        }
+    }
+
+    function updateResultsDisplay() {
+        // Update results header
+        document.getElementById('totalResults').textContent = currentData.length;
+        
+        // Calculate pagination
+        totalPages = Math.ceil(currentData.length / pageSize);
+        const startIndex = (currentPage - 1) * pageSize;
+        const endIndex = Math.min(startIndex + pageSize, currentData.length);
+        const currentPageData = currentData.slice(startIndex, endIndex);
+        
+        document.getElementById('currentResults').textContent = currentPageData.length;
+        
+        // Update view based on selected mode
+        if (viewModeSelect.value === 'card') {
+            renderCardView(currentPageData);
+            cardView.classList.remove('hidden');
+            tableView.classList.add('hidden');
+        } else {
+            renderTableView(currentPageData);
+            tableView.classList.remove('hidden');
+            cardView.classList.add('hidden');
+        }
+        
+        updatePagination();
+    }
+
+    function renderCardView(players) {
+        cardView.innerHTML = '';
+        
+        players.forEach(player => {
+            const card = document.createElement('div');
+            card.className = 'bg-white rounded-lg shadow-md p-4 hover:shadow-lg transition-shadow';
+            
+            card.innerHTML = `
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center">
+                        <input type="checkbox" class="player-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500 mr-2" 
+                               data-player-id="${player.player_id}" ${selectedPlayers.has(player.player_id) ? 'checked' : ''}>
+                        <div>
+                            <h3 class="font-semibold text-gray-900 text-sm">${player.web_name}</h3>
+                            <p class="text-xs text-gray-500">${player.team_name} (${getPositionName(player.position)})</p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="font-bold text-blue-600">£${player.now_cost.toFixed(1)}M</div>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-3 text-sm">
+                    <div class="bg-gray-50 rounded p-2">
+                        <div class="text-xs text-gray-500">คะแนนรวม</div>
+                        <div class="font-semibold">${player.total_points}</div>
+                    </div>
+                    <div class="bg-gray-50 rounded p-2">
+                        <div class="text-xs text-gray-500">ฟอร์ม</div>
+                        <div class="font-semibold">${player.form.toFixed(1)}</div>
+                    </div>
+                    <div class="bg-green-50 rounded p-2">
+                        <div class="text-xs text-gray-500">คะแนนคาดหวัง</div>
+                        <div class="font-semibold text-green-600">${player.expected_points ? player.expected_points.toFixed(1) : 'N/A'}</div>
+                    </div>
+                    <div class="bg-blue-50 rounded p-2">
+                        <div class="text-xs text-gray-500">คะแนน/เกม</div>
+                        <div class="font-semibold text-blue-600">${player.points_per_game ? player.points_per_game.toFixed(1) : 'N/A'}</div>
+                    </div>
+                </div>
+                
+                <div class="mt-3 flex space-x-2">
+                    <button class="flex-1 text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded hover:bg-gray-200 transition-colors"
+                            onclick="viewPlayerDetail(${player.player_id})">
+                        📊 รายละเอียด
+                    </button>
+                    <button class="flex-1 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200 transition-colors"
+                            onclick="addToComparison(${player.player_id})">
+                        ⚖️ เปรียบเทียบ
+                    </button>
+                </div>
+            `;
+            
+            cardView.appendChild(card);
+        });
+        
+        // Add event listeners for checkboxes
+        document.querySelectorAll('.player-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const playerId = parseInt(this.dataset.playerId);
+                if (this.checked) {
+                    selectedPlayers.add(playerId);
+                } else {
+                    selectedPlayers.delete(playerId);
+                }
+                updateSelectedCount();
+            });
+        });
+    }
+
+    function renderTableView(players) {
+        const tbody = document.getElementById('tableBody');
+        tbody.innerHTML = '';
+        
+        players.forEach(player => {
+            const row = document.createElement('tr');
+            row.className = 'hover:bg-gray-50';
+            
+            row.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <input type="checkbox" class="player-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500" 
+                           data-player-id="${player.player_id}" ${selectedPlayers.has(player.player_id) ? 'checked' : ''}>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="font-medium text-gray-900">${player.web_name}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    ${getPositionName(player.position)}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    ${player.team_name}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">
+                    £${player.now_cost.toFixed(1)}M
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    ${player.total_points}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    ${player.form.toFixed(1)}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
+                    ${player.expected_points ? player.expected_points.toFixed(1) : 'N/A'}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <div class="flex space-x-2">
+                        <button onclick="viewPlayerDetail(${player.player_id})" 
+                                class="text-blue-600 hover:text-blue-900">รายละเอียด</button>
+                        <button onclick="addToComparison(${player.player_id})" 
+                                class="text-purple-600 hover:text-purple-900">เปรียบเทียบ</button>
+                    </div>
+                </td>
+            `;
+            
+            tbody.appendChild(row);
+        });
+        
+        // Add event listeners for checkboxes
+        document.querySelectorAll('.player-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const playerId = parseInt(this.dataset.playerId);
+                if (this.checked) {
+                    selectedPlayers.add(playerId);
+                } else {
+                    selectedPlayers.delete(playerId);
+                }
+                updateSelectedCount();
+            });
+        });
+    }
+
+    function updatePagination() {
+        document.getElementById('currentPage').textContent = currentPage;
+        document.getElementById('totalPages').textContent = totalPages;
+        
+        // Update page size select
+        document.getElementById('pageSize').value = pageSize;
+        
+        // Enable/disable navigation buttons
+        document.getElementById('prevPage').disabled = currentPage <= 1;
+        document.getElementById('nextPage').disabled = currentPage >= totalPages;
+    }
+
+    function updateSelectedCount() {
+        document.getElementById('selectedCount').textContent = selectedPlayers.size;
+    }
+
+    function clearAllFilters() {
+        document.getElementById('playerSearch').value = '';
+        document.getElementById('positionFilter').value = '';
+        document.getElementById('teamFilter').value = '';
+        document.getElementById('minPrice').value = '';
+        document.getElementById('maxPrice').value = '';
+        document.getElementById('sortBy').value = 'expected_points';
+        
+        selectedPlayers.clear();
+        updateSelectedCount();
+        showState('default');
+    }
+
+    function toggleViewMode() {
+        if (currentData.length > 0) {
+            updateResultsDisplay();
+        }
+    }
+
+    function showState(state) {
+        [loadingState, errorState, defaultState, noResults, cardView, tableView, resultsHeader, pagination].forEach(el => {
+            el.classList.add('hidden');
+        });
+        
+        switch(state) {
+            case 'loading':
+                loadingState.classList.remove('hidden');
+                break;
+            case 'error':
+                errorState.classList.remove('hidden');
+                break;
+            case 'noResults':
+                noResults.classList.remove('hidden');
+                break;
+            case 'results':
+                resultsHeader.classList.remove('hidden');
+                pagination.classList.remove('hidden');
+                if (viewModeSelect.value === 'card') {
+                    cardView.classList.remove('hidden');
+                } else {
+                    tableView.classList.remove('hidden');
+                }
+                break;
+            default:
+                defaultState.classList.remove('hidden');
+        }
+    }
+
+    function getPositionName(position) {
+        const names = {
+            'GKP': 'ผู้รักษาประตู',
+            'DEF': 'กองหลัง', 
+            'MID': 'กองกลาง',
+            'FWD': 'กองหน้า'
+        };
+        return names[position] || position;
+    }
+
+    // Global functions for button clicks
+    window.viewPlayerDetail = function(playerId) {
+        // Implementation for player detail view
+        console.log('View player detail:', playerId);
+    };
+
+    window.addToComparison = function(playerId) {
+        selectedPlayers.add(playerId);
+        updateSelectedCount();
+        
+        // Update checkbox if visible
+        const checkbox = document.querySelector(`[data-player-id="${playerId}"]`);
+        if (checkbox) {
+            checkbox.checked = true;
+        }
+    };
+
+    // Initialize with default state
+    showState('default');
+});
+</script>
+{% endblock %}
