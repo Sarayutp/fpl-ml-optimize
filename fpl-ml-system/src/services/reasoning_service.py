@@ -401,7 +401,7 @@ class ReasoningService:
                     transfer_reasons.append(reason)
                 analysis['transfer_reasoning'] = " | ".join(transfer_reasons)
             
-            # Overall summary - avoid circular reference
+            # Overall summary - avoid circular reference by not passing analysis dict
             analysis['summary'] = self._generate_overall_summary(optimization_result, {})
             
             return analysis
@@ -527,9 +527,8 @@ class ReasoningService:
             if captain_name:
                 summary_parts.append(f"กัปตัน {captain_name}")
             
-            # Add transfer summary if available
-            if 'transfer_reasoning' in analysis:
-                summary_parts.append("มีคำแนะนำการซื้อขายเพิ่มเติม")
+            # Add transfer summary if available (skip to avoid circular reference)
+            # Transfer reasoning will be added separately in the analysis dict
             
             return " ".join(summary_parts)
             

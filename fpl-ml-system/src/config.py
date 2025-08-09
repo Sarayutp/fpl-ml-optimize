@@ -16,7 +16,7 @@ class Config:
     DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 'yes')
     
     # Database configuration
-    DATABASE_URL = os.environ.get('DATABASE_URL', 'sqlite:///fpl.db')
+    DATABASE_URL = os.environ.get('DATABASE_URL', 'sqlite:///instance/fpl.db')
     SQLALCHEMY_DATABASE_URI = DATABASE_URL
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {

@@ -279,11 +279,15 @@ def optimize_team():
         
         # Get request data
         request_data = request.get_json()
-        if not request_data:
+        if request_data is None:
             logger.error("No JSON data provided")
             return jsonify(ValidationErrorResponse(
                 error="No JSON data provided"
             ).dict()), 400
+        
+        # Handle empty request from frontend
+        if not request_data:
+            request_data = {}
         
         logger.info(f"Request data: {request_data}")
         
@@ -319,12 +323,16 @@ def optimize_team():
         
         logger.info("Optimization completed, generating reasoning...")
         
-        # Generate simple reasoning to avoid recursion
+        # Generate simple reasoning with detailed error handling
         try:
+            logger.info("Generating reasoning...")
             reasoning = reasoning_service.generate_team_reasoning(result)
             result['reasoning'] = reasoning
+            logger.info("Reasoning generated successfully")
         except Exception as reasoning_error:
-            logger.warning(f"Reasoning generation failed: {reasoning_error}")
+            logger.error(f"Reasoning generation failed: {reasoning_error}")
+            import traceback
+            logger.error(f"Reasoning traceback: {traceback.format_exc()}")
             # Provide fallback reasoning
             total_cost = result.get('total_cost', 0)
             expected_points = result.get('expected_points', 0)

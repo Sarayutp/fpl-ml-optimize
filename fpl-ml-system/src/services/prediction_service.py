@@ -6,13 +6,34 @@ import pickle
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple, Any
 
-import numpy as np
-import pandas as pd
-import xgboost as xgb
+try:
+    import numpy as np
+    import pandas as pd
+    import xgboost as xgb
+    from sklearn.preprocessing import StandardScaler, LabelEncoder
+    from sklearn.model_selection import train_test_split, cross_val_score
+    from sklearn.metrics import mean_squared_error, mean_absolute_error
+    ML_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: ML libraries not available: {e}")
+    ML_AVAILABLE = False
+    # Create dummy classes for type hints
+    class DummyModule:
+        def __init__(self): pass
+        def __getattr__(self, name): return DummyModule
+        def __call__(self, *args, **kwargs): return DummyModule()
+    
+    np = DummyModule()
+    pd = DummyModule()
+    xgb = DummyModule()
+    StandardScaler = DummyModule
+    LabelEncoder = DummyModule
+    train_test_split = DummyModule()
+    cross_val_score = DummyModule()
+    mean_squared_error = DummyModule()
+    mean_absolute_error = DummyModule()
+
 from flask import current_app
-from sklearn.preprocessing import StandardScaler, LabelEncoder
-from sklearn.model_selection import train_test_split, cross_val_score
-from sklearn.metrics import mean_squared_error, mean_absolute_error
 
 from ..models.db_models import db, Player, Team, Fixture, PlayerPastStats, PlayerPrediction
 
@@ -46,6 +67,10 @@ class PredictionService:
     
     def load_model(self) -> bool:
         """Load trained model and preprocessing objects."""
+        if not ML_AVAILABLE:
+            logger.warning("ML libraries not available, using fallback predictions")
+            return False
+            
         try:
             model_dir = os.path.dirname(self.model_path)
             
@@ -462,6 +487,16 @@ class PredictionService:
     def predict_player_points(self, player_id: int, fixture_id: Optional[int] = None,
                             is_home: Optional[bool] = None) -> Optional[float]:
         """Predict expected points for a specific player."""
+        if not ML_AVAILABLE:
+            # Fallback prediction based on position and form
+            player = Player.query.filter_by(player_id=player_id).first()
+            if not player:
+                return None
+            base_points = {'GKP': 2.0, 'DEF': 2.5, 'MID': 3.0, 'FWD': 3.5}
+            form_factor = float(player.form or 0) / 10.0
+            cost_factor = (player.now_cost / 10.0) / 5.0
+            return max(0.5, base_points.get(player.position, 2.0) * (1 + form_factor + cost_factor * 0.3))
+            
         if not self.model_loaded:
             logger.warning("Model not loaded. Cannot make predictions.")
             return None

@@ -221,8 +221,45 @@
                         </nav>
                     </div>
 
-                    <!-- Player Lists -->
-                    <div id="playerLists">
+                    <!-- Squad Overview -->
+                    <div class="mb-6 bg-blue-50 rounded-lg p-4">
+                        <div class="grid grid-cols-3 gap-4 text-center">
+                            <div>
+                                <div class="text-2xl font-bold text-blue-600" id="totalSquadSize">15</div>
+                                <div class="text-sm text-gray-600">Total Squad</div>
+                            </div>
+                            <div>
+                                <div class="text-2xl font-bold text-green-600" id="startingXISize">11</div>
+                                <div class="text-sm text-gray-600">Starting XI</div>
+                            </div>
+                            <div>
+                                <div class="text-2xl font-bold text-orange-600" id="benchSize">4</div>
+                                <div class="text-sm text-gray-600">Bench</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Team Sections -->
+                    <div class="space-y-6">
+                        <!-- Starting XI -->
+                        <div class="bg-green-50 rounded-lg p-4">
+                            <h3 class="text-lg font-semibold text-green-800 mb-3">🏆 Starting XI (คะแนนคาดหวัง)</h3>
+                            <div id="startingXILists">
+                                <!-- Will be populated dynamically -->
+                            </div>
+                        </div>
+
+                        <!-- Bench -->
+                        <div class="bg-orange-50 rounded-lg p-4">
+                            <h3 class="text-lg font-semibold text-orange-800 mb-3">🪑 Bench (ตัวสำรอง)</h3>
+                            <div id="benchLists">
+                                <!-- Will be populated dynamically -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Legacy Player Lists (for position tabs) -->
+                    <div id="playerLists" class="hidden">
                         <!-- Will be populated dynamically -->
                     </div>
                 </div>
@@ -349,6 +386,11 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('totalCost').textContent = data.total_cost.toFixed(1);
         document.getElementById('remainingBudget').textContent = (100.0 - data.total_cost).toFixed(1);
         
+        // Update squad sizes
+        document.getElementById('totalSquadSize').textContent = data.players_data ? data.players_data.length : 15;
+        document.getElementById('startingXISize').textContent = data.starting_xi_data ? data.starting_xi_data.length : 11;
+        document.getElementById('benchSize').textContent = data.bench_data ? data.bench_data.length : 4;
+        
         // Update captain info
         document.getElementById('captainName').textContent = data.captain_name || 'N/A';
         document.getElementById('viceCaptainName').textContent = data.vice_captain_name || 'N/A';
@@ -357,10 +399,14 @@ document.addEventListener('DOMContentLoaded', function() {
         // Update reasoning
         document.getElementById('reasoningText').textContent = data.reasoning || 'ไม่มีคำอธิบาย';
         
-        // Generate formation display
+        // Generate formation display (from Starting XI only)
         generateFormationDisplay(data.players_by_position);
         
-        // Generate player lists
+        // Generate new squad displays
+        generateStartingXI(data.starting_xi_data || []);
+        generateBench(data.bench_data || []);
+        
+        // Generate legacy player lists (for position tabs)
         generatePlayerLists(data.players_by_position);
         
         // Initialize position tabs
@@ -476,6 +522,144 @@ document.addEventListener('DOMContentLoaded', function() {
             'FWD': 'กองหน้า'
         };
         return names[position] || position;
+    }
+
+    function generateStartingXI(startingXIData) {
+        const startingXILists = document.getElementById('startingXILists');
+        
+        if (!startingXIData || startingXIData.length === 0) {
+            startingXILists.innerHTML = '<p class="text-center text-gray-500">ไม่มีข้อมูลผู้เล่นตัวจริง</p>';
+            return;
+        }
+
+        // Group players by position for Starting XI display
+        const positions = ['GKP', 'DEF', 'MID', 'FWD'];
+        const playersByPos = {};
+        
+        positions.forEach(pos => {
+            playersByPos[pos] = startingXIData.filter(player => player.position === pos);
+        });
+
+        let html = '';
+        positions.forEach(position => {
+            const players = playersByPos[position] || [];
+            if (players.length > 0) {
+                html += `
+                    <div class="mb-4">
+                        <h4 class="text-md font-medium text-green-700 mb-2">${getPositionName(position)} (${players.length})</h4>
+                        <div class="space-y-2">
+                `;
+                
+                players.forEach(player => {
+                    html += `
+                        <div class="flex items-center justify-between p-3 bg-white rounded-lg border border-green-200">
+                            <div class="flex-1">
+                                <div class="flex items-center">
+                                    <span class="font-semibold text-gray-900">${player.web_name}</span>
+                                    <span class="ml-2 text-sm text-gray-500">(${player.team_name})</span>
+                                    ${player.is_captain ? '<span class="ml-2 text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded font-medium">กัปตัน</span>' : ''}
+                                    ${player.is_vice_captain ? '<span class="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded font-medium">รองกัปตัน</span>' : ''}
+                                </div>
+                                <div class="text-sm text-gray-500 mt-1">
+                                    คะแนนคาดหวัง: ${player.expected_points.toFixed(1)} | 
+                                    ฟอร์ม: ${player.form.toFixed(1)} | 
+                                    คะแนนรวม: ${player.total_points}
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <div class="font-semibold text-green-600">£${player.now_cost.toFixed(1)}M</div>
+                                <div class="text-xs text-gray-500">ตัวจริง</div>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                html += '</div></div>';
+            }
+        });
+
+        startingXILists.innerHTML = html;
+    }
+
+    function generateBench(benchData) {
+        const benchLists = document.getElementById('benchLists');
+        
+        if (!benchData || benchData.length === 0) {
+            benchLists.innerHTML = '<p class="text-center text-gray-500">ไม่มีข้อมูลผู้เล่นสำรอง</p>';
+            return;
+        }
+
+        // Group bench players by position for organized display
+        const positions = ['GKP', 'DEF', 'MID', 'FWD'];
+        const playersByPos = {};
+        
+        positions.forEach(pos => {
+            playersByPos[pos] = benchData.filter(player => player.position === pos);
+        });
+
+        let html = '';
+        positions.forEach(position => {
+            const players = playersByPos[position] || [];
+            if (players.length > 0) {
+                html += `
+                    <div class="mb-4">
+                        <h4 class="text-md font-medium text-orange-700 mb-2">${getPositionName(position)} (${players.length})</h4>
+                        <div class="space-y-2">
+                `;
+                
+                players.forEach(player => {
+                    html += `
+                        <div class="flex items-center justify-between p-3 bg-white rounded-lg border border-orange-200">
+                            <div class="flex-1">
+                                <div class="flex items-center">
+                                    <span class="font-semibold text-gray-900">${player.web_name}</span>
+                                    <span class="ml-2 text-sm text-gray-500">(${player.team_name})</span>
+                                </div>
+                                <div class="text-sm text-gray-500 mt-1">
+                                    คะแนนคาดหวัง: ${player.expected_points.toFixed(1)} | 
+                                    ฟอร์ม: ${player.form.toFixed(1)} | 
+                                    คะแนนรวม: ${player.total_points}
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <div class="font-semibold text-orange-600">£${player.now_cost.toFixed(1)}M</div>
+                                <div class="text-xs text-gray-500">ตัวสำรอง</div>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                html += '</div></div>';
+            }
+        });
+
+        // If no players by position, show all bench players in simple list
+        if (!html) {
+            html = '<div class="space-y-2">';
+            benchData.forEach(player => {
+                html += `
+                    <div class="flex items-center justify-between p-3 bg-white rounded-lg border border-orange-200">
+                        <div class="flex-1">
+                            <div class="flex items-center">
+                                <span class="font-semibold text-gray-900">${player.web_name}</span>
+                                <span class="ml-2 text-sm text-gray-500">(${player.team_name} - ${getPositionName(player.position)})</span>
+                            </div>
+                            <div class="text-sm text-gray-500 mt-1">
+                                คะแนนคาดหวัง: ${player.expected_points.toFixed(1)} | 
+                                ฟอร์ม: ${player.form.toFixed(1)}
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-semibold text-orange-600">£${player.now_cost.toFixed(1)}M</div>
+                            <div class="text-xs text-gray-500">ตัวสำรอง</div>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+        }
+
+        benchLists.innerHTML = html;
     }
 
     // Initialize with default state

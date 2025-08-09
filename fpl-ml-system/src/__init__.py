@@ -51,14 +51,21 @@ def create_app(config_name=None):
     migrate = Migrate(app, db)
     cache = SimpleCache(app)
     
-    # Initialize services with app context
+    # Initialize services with app context (with fallback for ML issues)
     from .services.data_service import DataService
-    from .services.prediction_service import PredictionService
     from .services.optimization_service import OptimizationService
     from .services.reasoning_service import ReasoningService
     
     data_service = DataService(app, cache)
-    prediction_service = PredictionService(app)
+    
+    # Try to initialize prediction service, fall back if ML libraries fail
+    try:
+        from .services.prediction_service import PredictionService
+        prediction_service = PredictionService(app)
+    except ImportError as e:
+        app.logger.warning(f"Prediction service disabled due to ML library issues: {e}")
+        prediction_service = None
+    
     optimization_service = OptimizationService(app)
     reasoning_service = ReasoningService(app)
     

@@ -254,7 +254,21 @@
             </button>
         </div>
         <div id="comparisonContent">
-            <!-- Comparison content will be loaded here -->
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                สถิติ
+                            </th>
+                            <!-- Player headers will be added dynamically -->
+                        </tr>
+                    </thead>
+                    <tbody id="comparisonTableBody" class="bg-white divide-y divide-gray-200">
+                        <!-- Comparison rows will be added here -->
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 </div>
@@ -290,6 +304,20 @@ document.addEventListener('DOMContentLoaded', function() {
     searchBtn.addEventListener('click', performSearch);
     clearFiltersBtn.addEventListener('click', clearAllFilters);
     viewModeSelect.addEventListener('change', toggleViewMode);
+    
+    // Compare selected players button
+    document.getElementById('compareSelectedBtn').addEventListener('click', function() {
+        if (selectedPlayers.size < 2) {
+            alert('กรุณาเลือกผู้เล่นอย่างน้อย 2 คนเพื่อทำการเปรียบเทียบ');
+            return;
+        }
+        showComparisonModal();
+    });
+    
+    // Close comparison modal
+    document.getElementById('closeComparisonModal').addEventListener('click', function() {
+        document.getElementById('comparisonModal').classList.add('hidden');
+    });
 
     // Auto-search on Enter key
     document.getElementById('playerSearch').addEventListener('keypress', function(e) {
@@ -610,6 +638,80 @@ document.addEventListener('DOMContentLoaded', function() {
             checkbox.checked = true;
         }
     };
+    
+    // Function to show comparison modal
+    function showComparisonModal() {
+        const selectedPlayerIds = Array.from(selectedPlayers);
+        const selectedPlayersData = currentData.filter(player => 
+            selectedPlayerIds.includes(player.player_id)
+        );
+        
+        if (selectedPlayersData.length < 2) {
+            alert('ไม่พบข้อมูลผู้เล่นที่เลือก กรุณาค้นหาผู้เล่นก่อน');
+            return;
+        }
+        
+        // Update table header with player names
+        const tableHead = document.querySelector('#comparisonModal thead tr');
+        // Clear existing headers except first one (สถิติ)
+        const existingHeaders = tableHead.querySelectorAll('th');
+        for (let i = 1; i < existingHeaders.length; i++) {
+            existingHeaders[i].remove();
+        }
+        
+        // Add player name headers
+        selectedPlayersData.forEach(player => {
+            const th = document.createElement('th');
+            th.className = 'px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider';
+            th.innerHTML = `
+                <div class="flex flex-col items-center">
+                    <span class="font-bold text-gray-900">${player.web_name}</span>
+                    <span class="text-xs text-gray-500">${player.team_name}</span>
+                </div>
+            `;
+            tableHead.appendChild(th);
+        });
+        
+        // Get comparison table body and clear it
+        const comparisonTableBody = document.getElementById('comparisonTableBody');
+        comparisonTableBody.innerHTML = '';
+        
+        // Create comparison rows
+        const stats = [
+            {label: 'ตำแหน่ง', key: 'position', format: getPositionName},
+            {label: 'ราคา', key: 'now_cost', format: v => `£${v}M`},
+            {label: 'คะแนนรวม', key: 'total_points'},
+            {label: 'ฟอร์ม', key: 'form', format: v => v.toFixed(1)},
+            {label: 'คะแนนคาดหวัง', key: 'expected_points', format: v => v.toFixed(1)}
+        ];
+        
+        stats.forEach(stat => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td class="px-6 py-3 text-left text-sm font-medium text-gray-900 bg-gray-50">
+                    ${stat.label}
+                </td>
+                ${selectedPlayersData.map(player => {
+                    let value = player[stat.key];
+                    if (stat.format) {
+                        value = stat.format(value);
+                    }
+                    return `<td class="px-6 py-3 text-sm text-gray-900 text-center">${value}</td>`;
+                }).join('')}
+            `;
+            comparisonTableBody.appendChild(row);
+        });
+        
+        // Show modal
+        document.getElementById('comparisonModal').classList.remove('hidden');
+        
+        // Add click outside to close
+        document.getElementById('comparisonModal').onclick = function(e) {
+            if (e.target === this) {
+                this.classList.add('hidden');
+            }
+        };
+    }
 
     // Initialize with default state
     showState('default');

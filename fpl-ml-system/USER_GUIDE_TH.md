@@ -935,23 +935,40 @@ lsof -i :5001
 
 **อาการ:** API optimization error: maximum recursion depth exceeded
 
-**สาเหตุ:** Infinite loop ใน ReasoningService
+**สาเหตุ:** มีสองสาเหตุหลัก:
+1. Infinite loop ใน ReasoningService  
+2. ปัญหาความเข้ากันไม่ได้ของ NumPy version กับ pandas library
 
 **วิธีแก้ไข:**
-```bash
-# 1. ตรวจสอบว่าได้แก้ไขแล้ว
-python -c "
-from src import create_app
-app = create_app()
-with app.app_context():
-    result = app.optimization_service.optimize_team(budget=100.0)
-    reasoning = app.reasoning_service.generate_team_reasoning(result)
-    print('✅ Services working correctly')
-"
 
-# 2. หากยังเกิดปัญหา restart server
-pkill -f flask
-export PYTHONPATH="$PWD:$PYTHONPATH"  
+**Option A: ใช้ Temporary App (แนะนำ - ใช้งานได้ทันที)**
+```bash
+# หยุด Flask app ปัจจุบัน
+pkill -f "python.*app.py"
+
+# รัน temporary app ที่แก้ปัญหาแล้ว
+export PYTHONPATH="$PWD:$PYTHONPATH"
+python temp_app.py
+
+# ทดสอบ - ควรได้ผลลัพธ์ optimization
+curl -X POST http://localhost:5001/api/optimize \
+  -H "Content-Type: application/json" \
+  -d '{"budget": 100.0}'
+```
+
+**Option B: แก้ NumPy Compatibility (สำหรับ production)**
+```bash
+# ตรวจสอบ NumPy versions
+python -c "import numpy; print('NumPy version:', numpy.__version__)"
+
+# หาก NumPy เป็น 2.x ให้ลดเวอร์ชัน
+pip install "numpy<2.0" --force-reinstall
+
+# ติดตั้ง pandas ที่ compatible
+pip install "pandas>=1.5.0,<2.1.0"
+
+# รีสตาร์ท
+python app.py  
 flask run --port 5001
 ```
 

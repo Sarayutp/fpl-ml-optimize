@@ -141,31 +141,46 @@ class OptimizationService:
                 if players_selected[pid].value() == 1
             ]
             
+            # Always expect 15 players (full FPL squad)
             if len(selected_players) != 15:
-                raise ValueError(f"Invalid team size: {len(selected_players)} players selected")
+                raise ValueError(f"Invalid team size: {len(selected_players)} players selected (expected 15)")
             
             # Calculate team statistics
             total_cost = sum(player_costs[pid] for pid in selected_players)
             expected_points = sum(player_predictions[pid] for pid in selected_players)
             
-            # Select captain and vice-captain (highest expected points)
+            # Select Starting XI from the 15-player squad based on formation
+            starting_xi = self._select_starting_xi(
+                selected_players, formation, player_predictions, player_positions
+            )
+            
+            # Select captain and vice-captain from Starting XI (highest expected points)
             captain_candidates = sorted(
-                selected_players,
+                starting_xi,
                 key=lambda pid: player_predictions[pid],
                 reverse=True
             )
             captain_id = captain_candidates[0]
             vice_captain_id = captain_candidates[1]
             
-            # Validate formation
-            actual_formation = self._validate_team_formation(selected_players, player_positions)
+            # Calculate starting XI expected points (this is what matters for scoring)
+            starting_xi_points = sum(player_predictions[pid] for pid in starting_xi)
+            
+            # Get bench players (squad - starting XI)
+            bench_players = [pid for pid in selected_players if pid not in starting_xi]
+            
+            # Validate formation for starting XI
+            actual_formation = self._validate_team_formation(starting_xi, player_positions)
             
             result = {
-                'players': selected_players,
+                'players': selected_players,  # Full 15-player squad
+                'starting_xi': starting_xi,   # 11 best players in formation
+                'bench': bench_players,       # 4 substitute players  
                 'captain_id': captain_id,
                 'vice_captain_id': vice_captain_id,
                 'total_cost': round(total_cost, 1),
-                'expected_points': round(expected_points, 2),
+                'expected_points': round(starting_xi_points, 2),  # Only starting XI counts for points
+                'squad_expected_points': round(expected_points, 2),  # Total squad potential
                 'formation': actual_formation,
                 'budget_remaining': round(budget - total_cost, 1),
                 'optimization_status': LpStatus[prob.status],
@@ -252,23 +267,60 @@ class OptimizationService:
         
         return max(0.5, position_base * (1 + cost_factor * 0.5))
     
-    def _get_formation_constraints(self, formation: Optional[str] = None) -> Dict[str, int]:
-        """Get formation constraints for optimization."""
+    def _select_starting_xi(self, squad_players: List[int], formation: Optional[str], 
+                           player_predictions: Dict[int, float], 
+                           player_positions: Dict[int, str]) -> List[int]:
+        """Select the best 11 players from 15-player squad based on formation."""
+        
+        # Parse formation or use default
         if formation:
-            # Parse formation string like "3-5-2"
             try:
                 parts = formation.split('-')
                 if len(parts) == 3:
-                    return {
-                        'GKP': 2,  # Always 2 goalkeepers
+                    formation_needs = {
+                        'GKP': 1,
                         'DEF': int(parts[0]),
                         'MID': int(parts[1]),
                         'FWD': int(parts[2])
                     }
+                else:
+                    raise ValueError("Invalid formation")
             except (ValueError, IndexError):
-                logger.warning(f"Invalid formation format: {formation}. Using default.")
+                logger.warning(f"Invalid formation {formation}, using 3-4-3")
+                formation_needs = {'GKP': 1, 'DEF': 3, 'MID': 4, 'FWD': 3}
+        else:
+            formation_needs = {'GKP': 1, 'DEF': 3, 'MID': 4, 'FWD': 3}  # Default 3-4-3
         
-        # Default formation from config
+        # Group players by position
+        players_by_position = {'GKP': [], 'DEF': [], 'MID': [], 'FWD': []}
+        for player_id in squad_players:
+            position = player_positions[player_id]
+            players_by_position[position].append(player_id)
+        
+        # Sort each position by expected points (descending)
+        for position in players_by_position:
+            players_by_position[position].sort(
+                key=lambda pid: player_predictions[pid], 
+                reverse=True
+            )
+        
+        # Select best players for each position according to formation
+        starting_xi = []
+        for position, needed_count in formation_needs.items():
+            available_players = players_by_position[position]
+            if len(available_players) < needed_count:
+                raise ValueError(f"Not enough {position} players in squad: need {needed_count}, have {len(available_players)}")
+            
+            # Take the best players for this position
+            selected = available_players[:needed_count]
+            starting_xi.extend(selected)
+        
+        return starting_xi
+    
+    def _get_formation_constraints(self, formation: Optional[str] = None) -> Dict[str, int]:
+        """Get formation constraints for optimization."""
+        # Always use full squad constraints (15 players total) - FPL rules
+        # 2 GKP, 5 DEF, 5 MID, 3 FWD = 15 players total
         return current_app.config.get('FORMATION_CONSTRAINTS', {
             'GKP': 2,
             'DEF': 5,
