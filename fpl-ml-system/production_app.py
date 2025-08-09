@@ -320,16 +320,36 @@ def create_production_app():
                         gameweek = None
                 except (ValueError, TypeError):
                     gameweek = None
+                    
+            plan_ahead_raw = request_data.get('plan_ahead', 1)
+            try:
+                plan_ahead = int(plan_ahead_raw) if plan_ahead_raw not in [None, ''] else 1
+                if plan_ahead not in [1, 3, 5, 8]:
+                    plan_ahead = 5  # Default to 5 gameweeks ahead
+            except (ValueError, TypeError):
+                plan_ahead = 1
             
-            print(f"🔍 [DEBUG] Processed data - Budget: {budget} ({type(budget)}), Formation: {formation}, Max per team: {max_players_per_team} ({type(max_players_per_team)}), Gameweek: {gameweek}")
+            print(f"🔍 [DEBUG] Processed data - Budget: {budget} ({type(budget)}), Formation: {formation}, Max per team: {max_players_per_team} ({type(max_players_per_team)}), Gameweek: {gameweek}, Plan ahead: {plan_ahead}")
             print(f"🔍 [DEBUG] Preferred IDs: {preferred_player_ids}, Excluded IDs: {excluded_player_ids}")
             
             # Perform optimization with error tracking
             print("🤖 [DEBUG] Calling optimization service...")
             
-            if gameweek:
-                print(f"🏟️ [DEBUG] Using gameweek optimization for GW{gameweek}")
-                # Use gameweek-specific optimization that considers fixtures and FDR
+            if gameweek and plan_ahead > 1:
+                print(f"🌟 [DEBUG] Using multi-gameweek optimization: GW{gameweek} + {plan_ahead} weeks ahead")
+                # Use multi-gameweek optimization for long-term planning
+                result = app.optimization_service.optimize_for_multiple_gameweeks(
+                    start_gameweek=gameweek,
+                    gameweeks_ahead=plan_ahead,
+                    budget=budget,
+                    formation=formation,
+                    preferred_players=preferred_player_ids,
+                    excluded_players=excluded_player_ids,
+                    max_players_per_team=max_players_per_team
+                )
+            elif gameweek:
+                print(f"🏟️ [DEBUG] Using single gameweek optimization for GW{gameweek}")
+                # Use single gameweek optimization that considers fixtures and FDR
                 result = app.optimization_service.optimize_for_gameweek(
                     gameweek=gameweek,
                     budget=budget
@@ -646,6 +666,92 @@ def create_production_app():
             print(f"❌ [DEBUG] Data refresh error: {e}")
             return jsonify({'success': False, 'error': f'ไม่สามารถอัพเดทข้อมูลได้: {str(e)}'}), 500
     
+    @app.route('/api/transfer-suggestions', methods=['POST'])
+    def get_transfer_suggestions():
+        """Get free transfer suggestions for current team."""
+        try:
+            print("🔄 [DEBUG] Transfer suggestions requested...")
+            
+            # Handle both JSON and form data
+            if request.is_json:
+                request_data = request.get_json() or {}
+            else:
+                request_data = request.form.to_dict()
+            
+            print(f"🔍 [DEBUG] Transfer request data: {request_data}")
+            
+            # Parse current team (list of player IDs or names)
+            current_team_input = request_data.get('current_team', [])
+            target_gameweek = request_data.get('gameweek', 2)  # Default to gameweek 2
+            budget_available = float(request_data.get('budget_available', 0.0))
+            max_suggestions = int(request_data.get('max_suggestions', 3))
+            
+            # Convert team input to player IDs
+            current_team_ids = []
+            
+            if isinstance(current_team_input, str) and current_team_input.strip():
+                # String format: comma-separated player names or IDs
+                team_items = [item.strip() for item in current_team_input.split(',') if item.strip()]
+            elif isinstance(current_team_input, list):
+                # List format
+                team_items = current_team_input
+            else:
+                team_items = []
+            
+            for item in team_items:
+                try:
+                    # Try to parse as integer (player ID)
+                    player_id = int(item)
+                    current_team_ids.append(player_id)
+                except ValueError:
+                    # Not a number, try to find player by name
+                    player = Player.query.filter(
+                        db.or_(
+                            Player.web_name.ilike(f'%{item}%'),
+                            Player.first_name.ilike(f'%{item}%'),
+                            Player.second_name.ilike(f'%{item}%')
+                        )
+                    ).filter(Player.status == 'a').first()
+                    
+                    if player:
+                        current_team_ids.append(player.player_id)
+                        print(f"🔍 [DEBUG] Found player: {item} -> {player.web_name} (ID: {player.player_id})")
+                    else:
+                        print(f"⚠️ [DEBUG] Player not found: {item}")
+            
+            if not current_team_ids:
+                return jsonify({
+                    'success': False,
+                    'error': 'ไม่มีข้อมูลทีมปัจจุบัน กรุณาระบุรายชื่อผู้เล่นในทีม'
+                }), 400
+            
+            print(f"🔍 [DEBUG] Current team IDs: {current_team_ids} ({len(current_team_ids)} players)")
+            print(f"🔍 [DEBUG] Target gameweek: {target_gameweek}, Budget: £{budget_available}M")
+            
+            # Get transfer suggestions from optimization service
+            suggestions = app.optimization_service.suggest_free_transfers(
+                current_team=current_team_ids,
+                target_gameweek=target_gameweek,
+                max_suggestions=max_suggestions,
+                budget_available=budget_available
+            )
+            
+            print(f"✅ [DEBUG] Transfer suggestions completed: {suggestions.get('total_suggestions', 0)} suggestions")
+            
+            return jsonify({
+                'success': True,
+                'data': suggestions
+            })
+            
+        except Exception as e:
+            print(f"❌ [DEBUG] Transfer suggestions error: {e}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({
+                'success': False,
+                'error': f'ไม่สามารถสร้างคำแนะนำการเปลี่ยนตัวได้: {str(e)}'
+            }), 500
+
     @app.route('/api/players/search')
     def search_players():
         """Advanced player search API endpoint for scouting."""

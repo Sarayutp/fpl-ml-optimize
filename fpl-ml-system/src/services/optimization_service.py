@@ -700,6 +700,640 @@ class OptimizationService:
         
         return context
     
+    def optimize_for_multiple_gameweeks(self, 
+                                      start_gameweek: int,
+                                      gameweeks_ahead: int = 5,
+                                      budget: float = 100.0,
+                                      existing_team: Optional[List[int]] = None,
+                                      formation: Optional[str] = None,
+                                      preferred_players: Optional[List[int]] = None,
+                                      excluded_players: Optional[List[int]] = None,
+                                      max_players_per_team: int = 3) -> Dict:
+        """
+        Optimize team considering multiple gameweeks ahead for long-term planning.
+        
+        Args:
+            start_gameweek: Starting gameweek number
+            gameweeks_ahead: Number of gameweeks to look ahead (3, 5, 8)
+            budget: Available budget
+            existing_team: Current team if optimizing transfers  
+            formation: Target formation
+            preferred_players: Players to prioritize
+            excluded_players: Players to exclude
+            max_players_per_team: Max players per team
+            
+        Returns:
+            Optimization result with multi-gameweek fixture analysis
+        """
+        logger.info(f"Multi-gameweek optimization: GW{start_gameweek} + {gameweeks_ahead} weeks ahead")
+        
+        try:
+            # Get fixture contexts for multiple gameweeks
+            multi_fixture_contexts = {}
+            gameweek_range = list(range(start_gameweek, min(start_gameweek + gameweeks_ahead + 1, 39)))
+            
+            for gw in gameweek_range:
+                multi_fixture_contexts[gw] = self._get_gameweek_fixture_context(gw)
+            
+            # Get enhanced player data with multi-gameweek scoring
+            player_data = self._get_multi_gameweek_player_data(
+                multi_fixture_contexts, excluded_players
+            )
+            
+            if not player_data:
+                raise ValueError("No player data available for multi-gameweek optimization")
+                
+            # Create optimization problem  
+            prob = LpProblem("FPL_Multi_Gameweek_Optimization", LpMaximize)
+            
+            # Extract player info
+            player_ids = list(player_data.keys())
+            player_predictions = {pid: data['multi_gameweek_score'] for pid, data in player_data.items()}
+            player_costs = {pid: data['cost'] for pid, data in player_data.items()}
+            player_positions = {pid: data['position'] for pid, data in player_data.items()}
+            player_teams = {pid: data['team_id'] for pid, data in player_data.items()}
+            
+            # Decision variables
+            players_selected = LpVariable.dicts("player", player_ids, cat='Binary')
+            
+            # Objective function: Maximize multi-gameweek expected points
+            prob += lpSum([
+                player_predictions[pid] * players_selected[pid] 
+                for pid in player_ids
+            ])
+            
+            # Standard FPL constraints
+            prob += lpSum([player_costs[pid] * players_selected[pid] for pid in player_ids]) <= budget
+            
+            # Formation constraints
+            formation_constraints = self._get_formation_constraints(formation)
+            for position, count in formation_constraints.items():
+                position_players = [pid for pid, pos in player_positions.items() if pos == position]
+                prob += lpSum([players_selected[pid] for pid in position_players]) == count
+                
+            # Team constraint
+            team_ids = set(player_teams.values())
+            for team_id in team_ids:
+                team_players = [pid for pid, tid in player_teams.items() if tid == team_id]
+                prob += lpSum([players_selected[pid] for pid in team_players]) <= max_players_per_team
+                
+            # Preferred players constraint
+            if preferred_players:
+                for pid in preferred_players:
+                    if pid in players_selected:
+                        prob += players_selected[pid] == 1
+                        
+            # Solve optimization
+            prob.solve()
+            
+            if LpStatus[prob.status] != 'Optimal':
+                if LpStatus[prob.status] == 'Infeasible':
+                    raise ValueError("No feasible solution for multi-gameweek optimization")
+                    
+            # Extract solution
+            selected_players = [pid for pid in player_ids if players_selected[pid].value() == 1]
+            
+            if len(selected_players) != 15:
+                raise ValueError(f"Invalid team size: {len(selected_players)} players selected")
+                
+            # Calculate costs and points
+            total_cost = sum(player_costs[pid] for pid in selected_players)
+            multi_gw_points = sum(player_predictions[pid] for pid in selected_players)
+            
+            # Select Starting XI using single gameweek logic for current week
+            current_gw_context = multi_fixture_contexts.get(start_gameweek, {})
+            starting_xi = self._select_starting_xi(
+                selected_players, formation, 
+                {pid: player_data[pid]['current_gameweek_score'] for pid in selected_players},
+                player_positions, preferred_players
+            )
+            
+            # Captain selection for current gameweek
+            captain_candidates = sorted(
+                starting_xi,
+                key=lambda pid: player_data[pid]['current_gameweek_score'],
+                reverse=True
+            )
+            captain_id = captain_candidates[0]
+            vice_captain_id = captain_candidates[1] if len(captain_candidates) > 1 else captain_candidates[0]
+            
+            # Calculate current gameweek points (for display)
+            current_gw_points = sum(player_data[pid]['current_gameweek_score'] for pid in starting_xi)
+            bench_players = [pid for pid in selected_players if pid not in starting_xi]
+            
+            # Multi-gameweek fixture analysis
+            multi_fixture_analysis = self._analyze_multi_gameweek_fixtures(
+                selected_players, multi_fixture_contexts, gameweek_range
+            )
+            
+            result = {
+                'players': selected_players,
+                'starting_xi': starting_xi,
+                'bench': bench_players,
+                'captain_id': captain_id,
+                'vice_captain_id': vice_captain_id,
+                'total_cost': round(total_cost, 1),
+                'expected_points': round(current_gw_points, 2),  # Current gameweek for display
+                'multi_gameweek_points': round(multi_gw_points, 2),  # Total across all gameweeks
+                'formation': self._validate_team_formation(starting_xi, player_positions),
+                'budget_remaining': round(budget - total_cost, 1),
+                'optimization_status': LpStatus[prob.status],
+                'gameweek_range': gameweek_range,
+                'gameweeks_ahead': gameweeks_ahead,
+                'multi_gameweek_analysis': multi_fixture_analysis
+            }
+            
+            logger.info(f"Multi-gameweek optimization completed: {len(selected_players)} players, "
+                       f"Current GW: {current_gw_points:.1f} pts, Multi-GW: {multi_gw_points:.1f} pts")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Multi-gameweek optimization failed: {e}")
+            raise
+
+    def suggest_free_transfers(self, 
+                              current_team: List[int],
+                              target_gameweek: int,
+                              max_suggestions: int = 3,
+                              budget_available: float = 0.0) -> Dict:
+        """
+        Suggest free transfers for the current team based on form, fixtures, and value.
+        
+        Args:
+            current_team: List of current player IDs
+            target_gameweek: Gameweek to optimize for
+            max_suggestions: Maximum number of transfer suggestions
+            budget_available: Available budget for transfers (ITB money)
+        
+        Returns:
+            Dict with transfer suggestions and reasoning
+        """
+        logger.info(f"Generating free transfer suggestions for GW{target_gameweek}")
+        
+        try:
+            # Get current team player data
+            current_players_data = {}
+            for player_id in current_team:
+                player = Player.query.get(player_id)
+                if player:
+                    current_players_data[player_id] = {
+                        'id': player.player_id,
+                        'name': player.web_name,
+                        'position': player.position,
+                        'team_id': player.team_id,
+                        'cost': player.now_cost / 10.0,
+                        'form': float(player.form or 0),
+                        'total_points': player.total_points,
+                        'expected_points': self._calculate_player_expected_points(player, target_gameweek)
+                    }
+            
+            # Get fixture context for target gameweek
+            fixture_context = self._get_gameweek_fixture_context(target_gameweek)
+            
+            # Analyze current team weaknesses
+            transfer_suggestions = []
+            
+            # Group players by position for targeted analysis
+            positions = ['GKP', 'DEF', 'MID', 'FWD']
+            
+            for position in positions:
+                position_players = [
+                    pid for pid, data in current_players_data.items() 
+                    if data['position'] == position
+                ]
+                
+                if not position_players:
+                    continue
+                
+                # Find the weakest player in this position based on multiple factors
+                weak_candidates = self._identify_weak_players(
+                    position_players, current_players_data, fixture_context, target_gameweek
+                )
+                
+                # Find the best replacement options
+                for weak_player_id in weak_candidates[:2]:  # Top 2 weakest in each position
+                    weak_player = current_players_data[weak_player_id]
+                    
+                    # Find better alternatives
+                    alternatives = self._find_transfer_alternatives(
+                        weak_player, fixture_context, target_gameweek, budget_available
+                    )
+                    
+                    for alternative in alternatives[:1]:  # Top alternative per weak player
+                        transfer_value = self._calculate_transfer_value(weak_player, alternative, fixture_context)
+                        
+                        if transfer_value['improvement_score'] > 0.5:  # Only suggest if significant improvement
+                            suggestion = {
+                                'transfer_out': {
+                                    'id': weak_player['id'],
+                                    'name': weak_player['name'],
+                                    'position': weak_player['position'],
+                                    'cost': weak_player['cost'],
+                                    'form': weak_player['form'],
+                                    'expected_points': weak_player['expected_points'],
+                                    'weakness_reasons': transfer_value['out_reasons']
+                                },
+                                'transfer_in': {
+                                    'id': alternative['id'],
+                                    'name': alternative['name'], 
+                                    'position': alternative['position'],
+                                    'cost': alternative['cost'],
+                                    'form': alternative['form'],
+                                    'expected_points': alternative['expected_points'],
+                                    'strength_reasons': transfer_value['in_reasons']
+                                },
+                                'cost_difference': alternative['cost'] - weak_player['cost'],
+                                'points_improvement': alternative['expected_points'] - weak_player['expected_points'],
+                                'improvement_score': transfer_value['improvement_score'],
+                                'priority': self._calculate_transfer_priority(transfer_value),
+                                'reasoning': transfer_value['reasoning']
+                            }
+                            
+                            transfer_suggestions.append(suggestion)
+            
+            # Sort suggestions by improvement score and priority
+            transfer_suggestions.sort(key=lambda x: (x['priority'], x['improvement_score']), reverse=True)
+            
+            # Limit to max_suggestions
+            final_suggestions = transfer_suggestions[:max_suggestions]
+            
+            # Generate overall reasoning
+            overall_reasoning = self._generate_transfer_reasoning(final_suggestions, target_gameweek, fixture_context)
+            
+            result = {
+                'gameweek': target_gameweek,
+                'suggestions': final_suggestions,
+                'total_suggestions': len(final_suggestions),
+                'reasoning': overall_reasoning,
+                'fixture_context': {
+                    'gameweek': target_gameweek,
+                    'total_fixtures': len(fixture_context),
+                    'average_difficulty': sum(f.get('difficulty', 3) for f in fixture_context.values()) / len(fixture_context) if fixture_context else 3
+                }
+            }
+            
+            logger.info(f"Generated {len(final_suggestions)} transfer suggestions for GW{target_gameweek}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error generating transfer suggestions: {e}")
+            return {
+                'gameweek': target_gameweek,
+                'suggestions': [],
+                'total_suggestions': 0,
+                'reasoning': f"ไม่สามารถสร้างคำแนะนำการเปลี่ยนตัวได้: {str(e)}",
+                'error': str(e)
+            }
+
+    def _identify_weak_players(self, player_ids: List[int], players_data: Dict, 
+                             fixture_context: Dict, gameweek: int) -> List[int]:
+        """Identify weak players based on form, fixtures, and value."""
+        weak_scores = {}
+        
+        for player_id in player_ids:
+            player = players_data[player_id]
+            weakness_score = 0
+            
+            # Poor form (0-3 points)
+            if player['form'] < 3.0:
+                weakness_score += 2
+            elif player['form'] < 4.0:
+                weakness_score += 1
+                
+            # Bad fixture (difficulty > 3)
+            team_fixture = fixture_context.get(player['team_id'], {})
+            if team_fixture.get('difficulty', 3) > 3:
+                weakness_score += 1
+                
+            # Low expected points
+            if player['expected_points'] < 4.0:
+                weakness_score += 1
+                
+            # Price vs performance ratio
+            if player['cost'] > 0:
+                value_ratio = player['expected_points'] / player['cost']
+                if value_ratio < 0.5:  # Less than 0.5 points per million
+                    weakness_score += 1
+            
+            weak_scores[player_id] = weakness_score
+        
+        # Return players sorted by weakness score (highest first)
+        return sorted(weak_scores.keys(), key=lambda pid: weak_scores[pid], reverse=True)
+
+    def _find_transfer_alternatives(self, weak_player: Dict, fixture_context: Dict, 
+                                  gameweek: int, budget_available: float) -> List[Dict]:
+        """Find better alternatives for a weak player."""
+        max_cost = weak_player['cost'] + budget_available
+        
+        # Query available players in same position
+        alternatives_query = Player.query.filter(
+            Player.position == weak_player['position'],
+            Player.status == 'a',
+            Player.now_cost <= max_cost * 10,  # Convert to FPL price format
+            Player.player_id != weak_player['id']
+        ).order_by(Player.form.desc(), Player.total_points.desc()).limit(20)
+        
+        alternatives = []
+        for player in alternatives_query.all():
+            # Get team fixture info
+            team_fixture = fixture_context.get(player.team_id, {})
+            fixture_difficulty = team_fixture.get('difficulty', 3)
+            
+            expected_points = self._calculate_player_expected_points(player, gameweek)
+            
+            # Only consider players with better prospects
+            if (expected_points > weak_player['expected_points'] * 1.1 or  # 10% better expected points
+                (player.form > weak_player['form'] + 1.0 and fixture_difficulty <= 3)):  # Much better form + decent fixture
+                
+                alternatives.append({
+                    'id': player.player_id,
+                    'name': player.web_name,
+                    'position': player.position,
+                    'team_id': player.team_id,
+                    'cost': player.now_cost / 10.0,
+                    'form': float(player.form or 0),
+                    'total_points': player.total_points,
+                    'expected_points': expected_points,
+                    'fixture_difficulty': fixture_difficulty,
+                    'is_home': team_fixture.get('is_home', False)
+                })
+        
+        # Sort by expected points and form
+        alternatives.sort(key=lambda x: (x['expected_points'], x['form']), reverse=True)
+        
+        return alternatives[:5]  # Top 5 alternatives
+
+    def _calculate_transfer_value(self, out_player: Dict, in_player: Dict, 
+                                fixture_context: Dict) -> Dict:
+        """Calculate the value of a potential transfer."""
+        
+        # Points improvement
+        points_diff = in_player['expected_points'] - out_player['expected_points']
+        
+        # Form improvement  
+        form_diff = in_player['form'] - out_player['form']
+        
+        # Fixture improvement
+        out_fixture = fixture_context.get(out_player['team_id'], {})
+        in_fixture = fixture_context.get(in_player['team_id'], {})
+        fixture_diff = out_fixture.get('difficulty', 3) - in_fixture.get('difficulty', 3)
+        
+        # Cost efficiency
+        cost_diff = in_player['cost'] - out_player['cost']
+        
+        # Calculate improvement score (0-5 scale)
+        improvement_score = 0
+        
+        # Points improvement (max 2 points)
+        improvement_score += min(2, max(0, points_diff / 2))
+        
+        # Form improvement (max 1.5 points) 
+        improvement_score += min(1.5, max(0, form_diff / 3))
+        
+        # Fixture improvement (max 1 point)
+        improvement_score += min(1, max(0, fixture_diff / 2))
+        
+        # Cost efficiency bonus (max 0.5 points)
+        if cost_diff <= 0:  # Cheaper or same price
+            improvement_score += 0.5
+        elif cost_diff <= 1.0:  # Up to 1M more expensive
+            improvement_score += 0.2
+        
+        # Generate reasoning
+        out_reasons = []
+        if out_player['form'] < 3:
+            out_reasons.append(f"ฟอร์มไม่ดี ({out_player['form']:.1f})")
+        if out_fixture.get('difficulty', 3) > 3:
+            out_reasons.append("ตารางแข่งขันยาก")
+        if out_player['expected_points'] < 4:
+            out_reasons.append("คะแนนคาดหวังต่ำ")
+            
+        in_reasons = []
+        if form_diff > 1:
+            in_reasons.append(f"ฟอร์มดีกว่า ({in_player['form']:.1f})")
+        if fixture_diff > 0:
+            in_reasons.append("ตารางแข่งขันง่ายกว่า")
+        if points_diff > 1:
+            in_reasons.append(f"คะแนนคาดหวังสูงกว่า ({points_diff:.1f})")
+        if cost_diff <= 0:
+            in_reasons.append("ราคาถูกกว่าหรือเท่ากัน")
+            
+        reasoning = f"เปลี่ยน {out_player['name']} เป็น {in_player['name']} "
+        if points_diff > 0:
+            reasoning += f"เพิ่มคะแนนคาดหวัง {points_diff:.1f} "
+        if form_diff > 1:
+            reasoning += f"ฟอร์มดีขึ้น {form_diff:.1f} "
+        if cost_diff != 0:
+            if cost_diff > 0:
+                reasoning += f"ใช้เงินเพิ่ม £{cost_diff:.1f}M"
+            else:
+                reasoning += f"ประหยัด £{abs(cost_diff):.1f}M"
+        
+        return {
+            'improvement_score': improvement_score,
+            'points_improvement': points_diff,
+            'form_improvement': form_diff,
+            'fixture_improvement': fixture_diff,
+            'cost_efficiency': -cost_diff,  # Negative cost is better
+            'out_reasons': out_reasons,
+            'in_reasons': in_reasons,
+            'reasoning': reasoning
+        }
+
+    def _calculate_transfer_priority(self, transfer_value: Dict) -> int:
+        """Calculate transfer priority (1-5, 5 being highest priority)."""
+        score = transfer_value['improvement_score']
+        
+        if score >= 4:
+            return 5  # Must have
+        elif score >= 3:
+            return 4  # Highly recommended
+        elif score >= 2:
+            return 3  # Good option
+        elif score >= 1:
+            return 2  # Consider
+        else:
+            return 1  # Low priority
+
+    def _generate_transfer_reasoning(self, suggestions: List[Dict], gameweek: int, 
+                                   fixture_context: Dict) -> str:
+        """Generate overall reasoning for transfer suggestions."""
+        if not suggestions:
+            return f"ไม่มีการเปลี่ยนตัวที่แนะนำสำหรับเกมวีคที่ {gameweek} ทีมปัจจุบันมีความเหมาะสมแล้ว"
+        
+        reasoning = f"🔄 คำแนะนำการเปลี่ยนตัวสำหรับเกมวีคที่ {gameweek}:\n\n"
+        
+        for i, suggestion in enumerate(suggestions, 1):
+            priority_text = {5: "จำเป็นมาก", 4: "แนะนำสูง", 3: "ตัวเลือกดี", 2: "พิจารณา", 1: "ไม่จำเป็น"}
+            
+            reasoning += f"{i}. {suggestion['reasoning']} "
+            reasoning += f"(ความสำคัญ: {priority_text.get(suggestion['priority'], 'ปกติ')})\n"
+            
+            if suggestion['cost_difference'] > 0:
+                reasoning += f"   💰 ต้องใช้เงินเพิ่ม £{suggestion['cost_difference']:.1f}M\n"
+            elif suggestion['cost_difference'] < 0:
+                reasoning += f"   💚 ประหยัดเงิน £{abs(suggestion['cost_difference']):.1f}M\n"
+            
+            reasoning += "\n"
+        
+        reasoning += "💡 คำแนะนำ: ควรพิจารณาตารางแข่งขันในสัปดาห์ถัดไปด้วย และอย่าลืมเช็ค injury news ก่อนทำการเปลี่ยนตัว"
+        
+        return reasoning
+
+    def _calculate_player_expected_points(self, player, gameweek: int) -> float:
+        """Calculate expected points for a player in specific gameweek."""
+        # Base calculation similar to production_app.py
+        position_base = {
+            'GKP': 4.0, 'DEF': 4.5, 'MID': 5.5, 'FWD': 6.0
+        }.get(player.position, 4.0)
+        
+        # Form factor
+        form_score = float(player.form or 0)
+        if form_score >= 8.0:
+            form_multiplier = 1.5
+        elif form_score >= 6.0:
+            form_multiplier = 1.3
+        elif form_score >= 4.0:
+            form_multiplier = 1.1
+        elif form_score >= 2.0:
+            form_multiplier = 0.9
+        else:
+            form_multiplier = 0.6
+            
+        # Season performance factor
+        total_points = player.total_points or 0
+        if total_points >= 250:
+            points_multiplier = 1.6
+        elif total_points >= 200:
+            points_multiplier = 1.4
+        elif total_points >= 150:
+            points_multiplier = 1.2
+        elif total_points >= 100:
+            points_multiplier = 1.0
+        elif total_points >= 50:
+            points_multiplier = 0.8
+        else:
+            points_multiplier = 0.5
+            
+        # Price factor
+        cost = player.now_cost / 10.0
+        if cost >= 13.0:
+            cost_multiplier = 1.4
+        elif cost >= 10.0:
+            cost_multiplier = 1.2
+        elif cost >= 7.0:
+            cost_multiplier = 1.0
+        elif cost >= 5.0:
+            cost_multiplier = 0.9
+        else:
+            cost_multiplier = 0.7
+            
+        expected = position_base * form_multiplier * points_multiplier * cost_multiplier
+        return max(1.0, min(12.0, round(expected, 1)))
+
+    def _get_multi_gameweek_player_data(self, multi_fixture_contexts: Dict[int, Dict], 
+                                      excluded_players: Optional[List[int]] = None) -> Dict:
+        """Get player data with enhanced scoring across multiple gameweeks."""
+        # Get base player data
+        player_data = self._get_player_data_for_optimization(excluded_players)
+        
+        # Enhance with multi-gameweek fixture analysis
+        for player_id, data in player_data.items():
+            base_points = data['expected_points']
+            current_gameweek_score = base_points
+            multi_gameweek_score = 0
+            
+            # Calculate points for each gameweek considering fixtures
+            for gw, fixture_context in multi_fixture_contexts.items():
+                if player_id in fixture_context:
+                    context = fixture_context[player_id]
+                    gw_score = base_points
+                    
+                    # Apply home advantage
+                    if context.get('is_home', True):
+                        gw_score *= 1.05
+                        
+                    # Apply fixture difficulty multiplier
+                    difficulty = context.get('fixture_difficulty', 3)
+                    difficulty_multiplier = 1 + (3 - difficulty) * 0.1  # Easier = higher points
+                    gw_score *= difficulty_multiplier
+                    
+                    # Weight current gameweek more heavily
+                    if list(multi_fixture_contexts.keys())[0] == gw:  # First gameweek
+                        current_gameweek_score = gw_score
+                        multi_gameweek_score += gw_score * 1.5  # Current GW weighted more
+                    else:
+                        # Future gameweeks weighted less due to uncertainty
+                        future_weight = 1.0 - (gw - list(multi_fixture_contexts.keys())[0]) * 0.1
+                        multi_gameweek_score += gw_score * max(0.5, future_weight)
+                else:
+                    # No fixture = no points for this gameweek
+                    if list(multi_fixture_contexts.keys())[0] == gw:
+                        current_gameweek_score = 0
+                        
+            data['current_gameweek_score'] = current_gameweek_score
+            data['multi_gameweek_score'] = multi_gameweek_score
+            
+        return player_data
+        
+    def _analyze_multi_gameweek_fixtures(self, player_ids: List[int], 
+                                       multi_fixture_contexts: Dict[int, Dict],
+                                       gameweek_range: List[int]) -> Dict:
+        """Analyze fixture difficulty across multiple gameweeks."""
+        analysis = {
+            'gameweek_range': f"GW{gameweek_range[0]}-{gameweek_range[-1]}",
+            'total_gameweeks': len(gameweek_range),
+            'gameweek_breakdown': {}
+        }
+        
+        total_fixtures = 0
+        total_difficulty = 0
+        total_home = 0
+        total_easy = 0
+        total_hard = 0
+        
+        for gw in gameweek_range:
+            fixture_context = multi_fixture_contexts.get(gw, {})
+            gw_difficulties = []
+            gw_home = 0
+            
+            for player_id in player_ids:
+                if player_id in fixture_context:
+                    context = fixture_context[player_id]
+                    difficulty = context.get('fixture_difficulty', 3)
+                    gw_difficulties.append(difficulty)
+                    total_difficulty += difficulty
+                    total_fixtures += 1
+                    
+                    if context.get('is_home'):
+                        gw_home += 1
+                        total_home += 1
+                        
+                    if difficulty <= 2:
+                        total_easy += 1
+                    elif difficulty >= 4:
+                        total_hard += 1
+                        
+            if gw_difficulties:
+                analysis['gameweek_breakdown'][f'gw_{gw}'] = {
+                    'avg_difficulty': round(sum(gw_difficulties) / len(gw_difficulties), 2),
+                    'home_players': gw_home,
+                    'fixtures_count': len(gw_difficulties)
+                }
+                
+        if total_fixtures > 0:
+            analysis.update({
+                'overall_avg_difficulty': round(total_difficulty / total_fixtures, 2),
+                'total_fixtures': total_fixtures,
+                'total_home_fixtures': total_home,
+                'total_easy_fixtures': total_easy,
+                'total_hard_fixtures': total_hard,
+                'fixture_quality_score': round((total_easy * 2 + total_hard * -1) / total_fixtures, 2)
+            })
+            
+        return analysis
+    
     def _analyze_fixture_difficulty(self, player_ids: List[int], 
                                   fixture_context: Dict) -> Dict:
         """Analyze fixture difficulty for selected players."""
