@@ -418,11 +418,180 @@ document.addEventListener('DOMContentLoaded', function() {
         fdrMatrix.innerHTML = html;
     }
     
+    // Calendar state
+    let currentCalendarDate = new Date();
+    
     // Render Calendar View
     function renderCalendar() {
         const calendarContent = document.getElementById('calendarContent');
-        calendarContent.innerHTML = '<p class="text-center text-gray-500">กำลังพัฒนา Calendar View...</p>';
+        
+        if (currentFixtures.length === 0) {
+            calendarContent.innerHTML = '<p class="text-center text-gray-500">ไม่มีข้อมูลการแข่งขันแสดง</p>';
+            return;
+        }
+        
+        // Group fixtures by date
+        const fixturesByDate = {};
+        currentFixtures.forEach(fixture => {
+            if (fixture.kickoff_time) {
+                const date = new Date(fixture.kickoff_time + (fixture.kickoff_time.includes('T') && !fixture.kickoff_time.includes('Z') ? 'Z' : ''));
+                const dateKey = date.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }); // YYYY-MM-DD format
+                
+                if (!fixturesByDate[dateKey]) {
+                    fixturesByDate[dateKey] = [];
+                }
+                fixturesByDate[dateKey].push(fixture);
+            }
+        });
+        
+        // Get current month/year
+        const year = currentCalendarDate.getFullYear();
+        const month = currentCalendarDate.getMonth();
+        
+        // Calendar header
+        let calendarHTML = `
+            <div class="flex justify-between items-center mb-6">
+                <button onclick="previousMonth()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                    ← เดือนก่อน
+                </button>
+                <h3 class="text-xl font-semibold">
+                    ${currentCalendarDate.toLocaleDateString('th-TH', { 
+                        year: 'numeric', 
+                        month: 'long' 
+                    })}
+                </h3>
+                <button onclick="nextMonth()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                    เดือนถัดไป →
+                </button>
+            </div>
+        `;
+        
+        // Days of week header
+        calendarHTML += `
+            <div class="grid grid-cols-7 gap-1 mb-2">
+                <div class="p-3 text-center font-medium text-gray-700">อา</div>
+                <div class="p-3 text-center font-medium text-gray-700">จ</div>
+                <div class="p-3 text-center font-medium text-gray-700">อ</div>
+                <div class="p-3 text-center font-medium text-gray-700">พ</div>
+                <div class="p-3 text-center font-medium text-gray-700">พฤ</div>
+                <div class="p-3 text-center font-medium text-gray-700">ศ</div>
+                <div class="p-3 text-center font-medium text-gray-700">ส</div>
+            </div>
+        `;
+        
+        // Calendar grid
+        calendarHTML += '<div class="grid grid-cols-7 gap-1 border border-gray-200 rounded-lg overflow-hidden">';
+        
+        // Get first day of month and number of days
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
+        const startDate = new Date(firstDay);
+        startDate.setDate(startDate.getDate() - firstDay.getDay()); // Start from Sunday
+        
+        // Generate 6 weeks (42 days)
+        for (let week = 0; week < 6; week++) {
+            for (let day = 0; day < 7; day++) {
+                const currentDay = new Date(startDate);
+                currentDay.setDate(startDate.getDate() + (week * 7) + day);
+                
+                const dayKey = currentDay.toLocaleDateString('en-CA');
+                const isCurrentMonth = currentDay.getMonth() === month;
+                const isToday = currentDay.toDateString() === new Date().toDateString();
+                const dayFixtures = fixturesByDate[dayKey] || [];
+                
+                let cellClass = 'min-h-24 p-1 border-r border-b border-gray-100 bg-white';
+                if (!isCurrentMonth) {
+                    cellClass += ' bg-gray-50 text-gray-400';
+                }
+                if (isToday) {
+                    cellClass += ' bg-blue-50 border-blue-200';
+                }
+                
+                calendarHTML += `<div class="${cellClass}">`;
+                calendarHTML += `<div class="text-sm font-medium mb-1 ${isToday ? 'text-blue-600' : ''}">${currentDay.getDate()}</div>`;
+                
+                // Add fixtures for this day
+                if (dayFixtures.length > 0 && isCurrentMonth) {
+                    dayFixtures.forEach(fixture => {
+                        const kickoffTime = new Date(fixture.kickoff_time + (fixture.kickoff_time.includes('T') && !fixture.kickoff_time.includes('Z') ? 'Z' : ''));
+                        const timeStr = kickoffTime.toLocaleTimeString('th-TH', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            timeZone: 'Asia/Bangkok'
+                        });
+                        
+                        const homeColor = getDifficultyColorForCalendar(fixture.home_team.difficulty);
+                        const awayColor = getDifficultyColorForCalendar(fixture.away_team.difficulty);
+                        
+                        calendarHTML += `
+                            <div class="text-xs mb-1 p-1 bg-gray-50 rounded border-l-2 border-gray-300">
+                                <div class="font-medium text-gray-800">${timeStr}</div>
+                                <div class="flex justify-between items-center">
+                                    <span class="inline-flex items-center">
+                                        <span class="w-2 h-2 rounded-full ${homeColor} mr-1"></span>
+                                        ${fixture.home_team.short_name}
+                                    </span>
+                                    <span class="text-gray-500 mx-1">vs</span>
+                                    <span class="inline-flex items-center">
+                                        <span class="w-2 h-2 rounded-full ${awayColor} mr-1"></span>
+                                        ${fixture.away_team.short_name}
+                                    </span>
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+                
+                calendarHTML += '</div>';
+            }
+        }
+        
+        calendarHTML += '</div>';
+        
+        // Legend
+        calendarHTML += `
+            <div class="mt-4 flex justify-center">
+                <div class="flex space-x-4 text-xs">
+                    <div class="flex items-center">
+                        <span class="w-3 h-3 rounded-full bg-green-500 mr-1"></span>
+                        <span>ง่าย (1-2)</span>
+                    </div>
+                    <div class="flex items-center">
+                        <span class="w-3 h-3 rounded-full bg-yellow-500 mr-1"></span>
+                        <span>ปกติ (3)</span>
+                    </div>
+                    <div class="flex items-center">
+                        <span class="w-3 h-3 rounded-full bg-red-500 mr-1"></span>
+                        <span>ยาก (4-5)</span>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        calendarContent.innerHTML = calendarHTML;
     }
+    
+    // Helper function for calendar difficulty colors
+    function getDifficultyColorForCalendar(difficulty) {
+        if (difficulty <= 2) return 'bg-green-500';
+        if (difficulty === 3) return 'bg-yellow-500';
+        return 'bg-red-500';
+    }
+    
+    // Calendar navigation functions
+    window.previousMonth = function() {
+        currentCalendarDate.setMonth(currentCalendarDate.getMonth() - 1);
+        if (currentFixtures.length > 0) {
+            renderCalendar();
+        }
+    };
+    
+    window.nextMonth = function() {
+        currentCalendarDate.setMonth(currentCalendarDate.getMonth() + 1);
+        if (currentFixtures.length > 0) {
+            renderCalendar();
+        }
+    };
     
     // Toggle between different views
     function toggleView() {
