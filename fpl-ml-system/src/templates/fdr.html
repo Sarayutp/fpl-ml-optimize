@@ -477,7 +477,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function formatDateTime(dateString) {
-        const date = new Date(dateString);
+        // Parse the time assuming it's UTC (from FPL API)
+        const date = new Date(dateString + (dateString.includes('T') && !dateString.includes('Z') ? 'Z' : ''));
+        
         return date.toLocaleDateString('th-TH', {
             weekday: 'short',
             month: 'short',
