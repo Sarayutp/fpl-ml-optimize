@@ -208,7 +208,7 @@ def create_production_app():
             return jsonify({'status': 'ok'})
         
         try:
-            print("🚀 [DEBUG] Starting optimization request...")
+            print("🚀 [DEBUG] ===== OPTIMIZATION REQUEST RECEIVED =====")
             
             # Handle both JSON and form data
             if request.is_json:
@@ -218,8 +218,11 @@ def create_production_app():
                 request_data = request.form.to_dict()
                 print("🔍 [DEBUG] Received form data")
             
-            print(f"🔍 [DEBUG] Request data: {request_data}")
+            print(f"🔍 [DEBUG] Raw request data: {request_data}")
             print(f"🔍 [DEBUG] Request content type: {request.content_type}")
+            print(f"🔍 [DEBUG] Request method: {request.method}")
+            print(f"🔍 [DEBUG] Request URL: {request.url}")
+            print(f"🔍 [DEBUG] User-Agent: {request.headers.get('User-Agent', 'Unknown')}")
             
             # Process and validate input data with better type handling
             budget_raw = request_data.get('budget', 100.0)
@@ -237,28 +240,37 @@ def create_production_app():
             if isinstance(preferred_players, str):
                 if preferred_players.strip() != "":
                     player_names = [p.strip() for p in preferred_players.split(',') if p.strip()]
-                    # Convert player names to IDs
-                    preferred_player_ids = []
-                    for name in player_names:
-                        player = Player.query.filter(
-                            db.or_(
-                                Player.web_name.ilike(f'%{name}%'),
-                                Player.first_name.ilike(f'%{name}%'),
-                                Player.second_name.ilike(f'%{name}%')
-                            )
-                        ).filter(Player.status == 'a').first()
-                        
-                        if player:
-                            preferred_player_ids.append(player.player_id)
-                            print(f"🔍 [DEBUG] Found preferred player: {name} -> {player.web_name} (ID: {player.player_id})")
-                        else:
-                            print(f"⚠️ [DEBUG] Preferred player not found: {name}")
-                    
-                    if not preferred_player_ids:
-                        preferred_player_ids = None
-                        print("⚠️ [DEBUG] No preferred players found from names")
+                else:
+                    player_names = []
             elif isinstance(preferred_players, list) and preferred_players:
-                preferred_player_ids = preferred_players
+                # If it's a list from JavaScript, join into names
+                player_names = [str(name).strip() for name in preferred_players if str(name).strip()]
+            else:
+                player_names = []
+                
+            # Convert player names to IDs
+            if player_names:
+                preferred_player_ids = []
+                for name in player_names:
+                    player = Player.query.filter(
+                        db.or_(
+                            Player.web_name.ilike(f'%{name}%'),
+                            Player.first_name.ilike(f'%{name}%'),
+                            Player.second_name.ilike(f'%{name}%')
+                        )
+                    ).filter(Player.status == 'a').first()
+                    
+                    if player:
+                        preferred_player_ids.append(player.player_id)
+                        print(f"🔍 [DEBUG] Found preferred player: {name} -> {player.web_name} (ID: {player.player_id})")
+                    else:
+                        print(f"⚠️ [DEBUG] Preferred player not found: {name}")
+                
+                if not preferred_player_ids:
+                    preferred_player_ids = None
+                    print("⚠️ [DEBUG] No preferred players found from names")
+            else:
+                preferred_player_ids = None
                 
             excluded_players = request_data.get('excluded_players')
             excluded_player_ids = None
@@ -387,7 +399,9 @@ def create_production_app():
                 traceback.print_exc()
                 result['reasoning'] = "คำอธิบายไม่พร้อมใช้งานในขณะนี้"
             
-            print("🎉 [DEBUG] Sending successful response")
+            print("🎉 [DEBUG] ===== SENDING SUCCESSFUL RESPONSE =====")
+            print(f"🔍 [DEBUG] Response contains Starting XI: {[p['web_name'] for p in result.get('starting_xi_data', [])]}")
+            print(f"🔍 [DEBUG] Response size: ~{len(str(result))} characters")
             return jsonify({'success': True, 'data': result})
             
         except Exception as e:
