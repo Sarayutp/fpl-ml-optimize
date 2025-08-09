@@ -9,7 +9,8 @@ import logging
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from flask import Flask, jsonify, request, render_template
-from src.models.db_models import db, Player, Team
+from sqlalchemy.orm import aliased
+from src.models.db_models import db, Player, Team, Fixture
 from src.services.data_service import DataService
 from src.services.optimization_service import OptimizationService
 from src.services.reasoning_service import ReasoningService
@@ -179,6 +180,11 @@ def create_production_app():
     def scouting():
         """Player scouting page."""
         return render_template('scouting.html')
+    
+    @app.route('/fdr')
+    def fdr():
+        """Fixture Difficulty Rating page."""
+        return render_template('fdr.html')
     
     # API Routes
     @app.route('/api/health')
@@ -482,6 +488,100 @@ def create_production_app():
             print(f"❌ Teams API error: {e}")
             return jsonify({'success': False, 'error': str(e)}), 500
     
+    @app.route('/api/fixtures')
+    def get_fixtures():
+        """Get fixtures API endpoint for FDR analysis."""
+        try:
+            print("🏟️ [DEBUG] Fixtures API requested...")
+            
+            # Parse query parameters
+            gameweek = request.args.get('gameweek', type=int)
+            team_id = request.args.get('team_id', type=int)
+            limit = min(int(request.args.get('limit', 100)), 500)
+            
+            # Create aliases for home and away teams
+            Team_home = aliased(Team)
+            Team_away = aliased(Team)
+            
+            # Build query
+            query = db.session.query(
+                Fixture.fixture_id,
+                Fixture.gameweek,
+                Fixture.home_team_id,
+                Fixture.away_team_id,
+                Fixture.home_difficulty,
+                Fixture.away_difficulty,
+                Fixture.kickoff_time,
+                Fixture.finished,
+                Fixture.started,
+                Team_home.name.label('home_team_name'),
+                Team_home.short_name.label('home_team_short'),
+                Team_away.name.label('away_team_name'),
+                Team_away.short_name.label('away_team_short')
+            ).join(
+                Team_home, Fixture.home_team_id == Team_home.team_id
+            ).join(
+                Team_away, Fixture.away_team_id == Team_away.team_id
+            ).order_by(Fixture.gameweek, Fixture.kickoff_time)
+            
+            # Apply filters
+            if gameweek:
+                query = query.filter(Fixture.gameweek == gameweek)
+            
+            if team_id:
+                query = query.filter(
+                    db.or_(
+                        Fixture.home_team_id == team_id,
+                        Fixture.away_team_id == team_id
+                    )
+                )
+            
+            # Get results with limit
+            fixtures = query.limit(limit).all()
+            
+            # Convert to dict
+            fixtures_data = []
+            for fixture in fixtures:
+                fixtures_data.append({
+                    'fixture_id': fixture.fixture_id,
+                    'gameweek': fixture.gameweek,
+                    'home_team': {
+                        'team_id': fixture.home_team_id,
+                        'name': fixture.home_team_name,
+                        'short_name': fixture.home_team_short,
+                        'difficulty': fixture.home_difficulty
+                    },
+                    'away_team': {
+                        'team_id': fixture.away_team_id,
+                        'name': fixture.away_team_name,
+                        'short_name': fixture.away_team_short,
+                        'difficulty': fixture.away_difficulty
+                    },
+                    'kickoff_time': fixture.kickoff_time.isoformat() if fixture.kickoff_time else None,
+                    'finished': fixture.finished,
+                    'started': fixture.started
+                })
+            
+            print(f"✅ [DEBUG] Fixtures API completed: {len(fixtures_data)} fixtures")
+            
+            return jsonify({
+                'success': True,
+                'data': {
+                    'fixtures': fixtures_data,
+                    'total_count': len(fixtures_data),
+                    'filters': {
+                        'gameweek': gameweek,
+                        'team_id': team_id
+                    }
+                }
+            })
+            
+        except Exception as e:
+            print(f"❌ [DEBUG] Fixtures API error: {e}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({'success': False, 'error': str(e)}), 500
+
     @app.route('/api/data/refresh', methods=['POST'])
     def refresh_data():
         """Refresh FPL data from API."""

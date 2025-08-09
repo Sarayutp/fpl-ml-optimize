@@ -1,0 +1,494 @@
+{% extends "base.html" %}
+
+{% block title %}FDR - Fixture Difficulty Rating - FPL AI Optimizer{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <!-- Header Section -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">🏟️ Fixture Difficulty Rating (FDR)</h1>
+        <p class="text-gray-600">วิเคราะห์ความยากของตารางแข่งขันแต่ละทีม เพื่อวางแผนการซื้อ-ขายผู้เล่น</p>
+    </div>
+
+    <!-- Filters Section -->
+    <div class="bg-white shadow-lg rounded-lg p-6 mb-8">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <!-- Gameweek Filter -->
+            <div>
+                <label for="gameweekFilter" class="block text-sm font-medium text-gray-700 mb-2">
+                    เกมวีค
+                </label>
+                <select id="gameweekFilter" 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">ทั้งหมด</option>
+                    <!-- Gameweeks 1-38 will be populated -->
+                </select>
+            </div>
+
+            <!-- Team Filter -->
+            <div>
+                <label for="teamFilter" class="block text-sm font-medium text-gray-700 mb-2">
+                    ทีม
+                </label>
+                <select id="teamFilter" 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">ทั้งหมด</option>
+                    <!-- Teams will be populated dynamically -->
+                </select>
+            </div>
+
+            <!-- View Mode -->
+            <div>
+                <label for="viewMode" class="block text-sm font-medium text-gray-700 mb-2">
+                    รูปแบบการแสดงผล
+                </label>
+                <select id="viewMode" 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="fixtures">ตารางแข่งขัน</option>
+                    <option value="matrix">ตารางเมทริกซ์ FDR</option>
+                    <option value="calendar">ปฏิทินการแข่งขัน</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="flex justify-between items-center">
+            <button id="loadDataBtn" 
+                    class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors">
+                🔄 โหลดข้อมูล
+            </button>
+            
+            <!-- FDR Legend -->
+            <div class="flex items-center space-x-4">
+                <div class="text-sm text-gray-600">ระดับความยาก:</div>
+                <div class="flex space-x-2">
+                    <span class="px-2 py-1 rounded text-xs bg-green-100 text-green-800">1-2 ง่าย</span>
+                    <span class="px-2 py-1 rounded text-xs bg-yellow-100 text-yellow-800">3 ปกติ</span>
+                    <span class="px-2 py-1 rounded text-xs bg-red-100 text-red-800">4-5 ยาก</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loadingState" class="hidden text-center py-12">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+        <p class="text-gray-600">กำลังโหลดข้อมูลตารางแข่งขัน...</p>
+    </div>
+
+    <!-- Error State -->
+    <div id="errorState" class="hidden bg-red-50 border border-red-200 rounded-lg p-6">
+        <div class="flex items-center">
+            <svg class="h-5 w-5 text-red-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+            </svg>
+            <span class="text-red-800">เกิดข้อผิดพลาด: <span id="errorMessage"></span></span>
+        </div>
+    </div>
+
+    <!-- Results Section -->
+    <div id="resultsSection" class="space-y-6">
+        <!-- Summary Cards -->
+        <div id="summaryCards" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <!-- Will be populated dynamically -->
+        </div>
+
+        <!-- Fixtures Table View -->
+        <div id="fixturesView" class="bg-white shadow-lg rounded-lg overflow-hidden">
+            <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-900">ตารางแข่งขัน</h3>
+                <p class="text-sm text-gray-600 mt-1">แสดงรายละเอียดการแข่งขันและ FDR แต่ละคู่</p>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">เกมวีค</th>
+                            <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">ทีมเหย้า</th>
+                            <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">FDR</th>
+                            <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">VS</th>
+                            <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">FDR</th>
+                            <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">ทีมเยือน</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">วันเวลา</th>
+                        </tr>
+                    </thead>
+                    <tbody id="fixturesTableBody" class="bg-white divide-y divide-gray-200">
+                        <!-- Fixtures will be populated here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- FDR Matrix View -->
+        <div id="matrixView" class="hidden bg-white shadow-lg rounded-lg p-6">
+            <div class="mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">ตารางเมทริกซ์ FDR</h3>
+                <p class="text-sm text-gray-600 mt-1">แสดง FDR ของทุกทีมในแต่ละเกมวีค</p>
+            </div>
+            <div id="fdrMatrix" class="overflow-x-auto">
+                <!-- FDR Matrix will be populated here -->
+            </div>
+        </div>
+
+        <!-- Calendar View -->
+        <div id="calendarView" class="hidden bg-white shadow-lg rounded-lg p-6">
+            <div class="mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">ปฏิทินการแข่งขัน</h3>
+                <p class="text-sm text-gray-600 mt-1">แสดงการแข่งขันในรูปแบบปฏิทิน</p>
+            </div>
+            <div id="calendarContent">
+                <!-- Calendar will be populated here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Default State -->
+    <div id="defaultState" class="text-center py-12 bg-gray-50 rounded-lg">
+        <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l7 7-7 7z" />
+        </svg>
+        <h3 class="text-lg font-medium text-gray-900 mb-2">เริ่มดูตารางแข่งขัน</h3>
+        <p class="text-gray-500 mb-4">กดปุ่ม "โหลดข้อมูล" เพื่อดูตารางแข่งขันและ FDR</p>
+        <button onclick="document.getElementById('loadDataBtn').click()" 
+                class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors">
+            โหลดตารางแข่งขัน
+        </button>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // State variables
+    let currentFixtures = [];
+    let allTeams = [];
+    
+    // DOM elements
+    const loadDataBtn = document.getElementById('loadDataBtn');
+    const gameweekFilter = document.getElementById('gameweekFilter');
+    const teamFilter = document.getElementById('teamFilter');
+    const viewModeSelect = document.getElementById('viewMode');
+    
+    // State elements
+    const loadingState = document.getElementById('loadingState');
+    const errorState = document.getElementById('errorState');
+    const defaultState = document.getElementById('defaultState');
+    const resultsSection = document.getElementById('resultsSection');
+    
+    // Views
+    const fixturesView = document.getElementById('fixturesView');
+    const matrixView = document.getElementById('matrixView');
+    const calendarView = document.getElementById('calendarView');
+    
+    // Initialize
+    initializeGameweekOptions();
+    loadTeams();
+    
+    // Event listeners
+    loadDataBtn.addEventListener('click', loadFixtures);
+    viewModeSelect.addEventListener('change', toggleView);
+    
+    // Initialize gameweek options (1-38)
+    function initializeGameweekOptions() {
+        const gameweekSelect = document.getElementById('gameweekFilter');
+        for (let i = 1; i <= 38; i++) {
+            const option = document.createElement('option');
+            option.value = i;
+            option.textContent = `เกมวีคที่ ${i}`;
+            gameweekSelect.appendChild(option);
+        }
+    }
+    
+    // Load teams for filter
+    async function loadTeams() {
+        try {
+            const response = await fetch('/api/teams');
+            const result = await response.json();
+            
+            if (result.success) {
+                allTeams = result.data;
+                const teamSelect = document.getElementById('teamFilter');
+                result.data.forEach(team => {
+                    const option = document.createElement('option');
+                    option.value = team.team_id;
+                    option.textContent = `${team.name} (${team.short_name})`;
+                    teamSelect.appendChild(option);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading teams:', error);
+        }
+    }
+    
+    // Load fixtures data
+    async function loadFixtures() {
+        showState('loading');
+        
+        try {
+            const gameweek = gameweekFilter.value || null;
+            const teamId = teamFilter.value || null;
+            
+            const params = new URLSearchParams();
+            if (gameweek) params.append('gameweek', gameweek);
+            if (teamId) params.append('team_id', teamId);
+            params.append('limit', '500');
+            
+            const response = await fetch(`/api/fixtures?${params.toString()}`);
+            const result = await response.json();
+            
+            if (result.success) {
+                currentFixtures = result.data.fixtures;
+                renderCurrentView();
+                generateSummaryCards();
+                showState('results');
+            } else {
+                throw new Error(result.error || 'Failed to load fixtures');
+            }
+        } catch (error) {
+            console.error('Error loading fixtures:', error);
+            document.getElementById('errorMessage').textContent = error.message;
+            showState('error');
+        }
+    }
+    
+    // Generate summary cards
+    function generateSummaryCards() {
+        const summaryCards = document.getElementById('summaryCards');
+        const totalFixtures = currentFixtures.length;
+        const easyFixtures = currentFixtures.filter(f => 
+            (f.home_team.difficulty <= 2) || (f.away_team.difficulty <= 2)
+        ).length;
+        const hardFixtures = currentFixtures.filter(f => 
+            (f.home_team.difficulty >= 4) || (f.away_team.difficulty >= 4)
+        ).length;
+        const avgDifficulty = currentFixtures.length > 0 ? 
+            (currentFixtures.reduce((sum, f) => 
+                sum + f.home_team.difficulty + f.away_team.difficulty, 0
+            ) / (currentFixtures.length * 2)).toFixed(1) : 0;
+        
+        summaryCards.innerHTML = `
+            <div class="bg-blue-50 p-4 rounded-lg">
+                <div class="text-2xl font-bold text-blue-600">${totalFixtures}</div>
+                <div class="text-sm text-gray-600">คู่แข่งขันทั้งหมด</div>
+            </div>
+            <div class="bg-green-50 p-4 rounded-lg">
+                <div class="text-2xl font-bold text-green-600">${easyFixtures}</div>
+                <div class="text-sm text-gray-600">คู่ง่าย (FDR 1-2)</div>
+            </div>
+            <div class="bg-red-50 p-4 rounded-lg">
+                <div class="text-2xl font-bold text-red-600">${hardFixtures}</div>
+                <div class="text-sm text-gray-600">คู่ยาก (FDR 4-5)</div>
+            </div>
+            <div class="bg-yellow-50 p-4 rounded-lg">
+                <div class="text-2xl font-bold text-yellow-600">${avgDifficulty}</div>
+                <div class="text-sm text-gray-600">FDR เฉลี่ย</div>
+            </div>
+        `;
+    }
+    
+    // Render current view based on selection
+    function renderCurrentView() {
+        const viewMode = viewModeSelect.value;
+        
+        switch (viewMode) {
+            case 'fixtures':
+                renderFixturesTable();
+                break;
+            case 'matrix':
+                renderFDRMatrix();
+                break;
+            case 'calendar':
+                renderCalendar();
+                break;
+        }
+    }
+    
+    // Render fixtures table
+    function renderFixturesTable() {
+        const tbody = document.getElementById('fixturesTableBody');
+        tbody.innerHTML = '';
+        
+        currentFixtures.forEach(fixture => {
+            const row = document.createElement('tr');
+            row.className = 'hover:bg-gray-50';
+            
+            row.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    GW${fixture.gameweek}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-center">
+                    <div class="font-medium text-gray-900">${fixture.home_team.short_name}</div>
+                    <div class="text-xs text-gray-500">${fixture.home_team.name}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-center">
+                    <span class="px-2 py-1 rounded text-xs font-medium ${getDifficultyColor(fixture.home_team.difficulty)}">
+                        ${fixture.home_team.difficulty}
+                    </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-center text-gray-500 font-bold">
+                    vs
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-center">
+                    <span class="px-2 py-1 rounded text-xs font-medium ${getDifficultyColor(fixture.away_team.difficulty)}">
+                        ${fixture.away_team.difficulty}
+                    </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-center">
+                    <div class="font-medium text-gray-900">${fixture.away_team.short_name}</div>
+                    <div class="text-xs text-gray-500">${fixture.away_team.name}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    ${fixture.kickoff_time ? formatDateTime(fixture.kickoff_time) : 'TBD'}
+                </td>
+            `;
+            
+            tbody.appendChild(row);
+        });
+    }
+    
+    // Render FDR Matrix
+    function renderFDRMatrix() {
+        const fdrMatrix = document.getElementById('fdrMatrix');
+        
+        if (currentFixtures.length === 0) {
+            fdrMatrix.innerHTML = '<p class="text-center text-gray-500">ไม่มีข้อมูลแสดง</p>';
+            return;
+        }
+        
+        // Group fixtures by gameweek
+        const fixturesByGW = {};
+        currentFixtures.forEach(fixture => {
+            if (!fixturesByGW[fixture.gameweek]) {
+                fixturesByGW[fixture.gameweek] = [];
+            }
+            fixturesByGW[fixture.gameweek].push(fixture);
+        });
+        
+        const gameweeks = Object.keys(fixturesByGW).sort((a, b) => a - b);
+        
+        let html = `
+            <table class="min-w-full table-auto border border-gray-200">
+                <thead>
+                    <tr class="bg-gray-50">
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">ทีม</th>
+        `;
+        
+        gameweeks.forEach(gw => {
+            html += `<th class="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase">GW${gw}</th>`;
+        });
+        
+        html += '</tr></thead><tbody>';
+        
+        // Create rows for each team
+        allTeams.forEach(team => {
+            html += `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-2 font-medium text-gray-900 bg-gray-50">${team.short_name}</td>
+            `;
+            
+            gameweeks.forEach(gw => {
+                const teamFixture = fixturesByGW[gw].find(f => 
+                    f.home_team.team_id === team.team_id || f.away_team.team_id === team.team_id
+                );
+                
+                if (teamFixture) {
+                    const isHome = teamFixture.home_team.team_id === team.team_id;
+                    const difficulty = isHome ? teamFixture.home_team.difficulty : teamFixture.away_team.difficulty;
+                    const opponent = isHome ? teamFixture.away_team.short_name : teamFixture.home_team.short_name;
+                    const venue = isHome ? '(H)' : '(A)';
+                    
+                    html += `
+                        <td class="px-2 py-2 text-center text-xs">
+                            <div class="flex flex-col items-center">
+                                <span class="px-1 py-1 rounded text-xs font-medium ${getDifficultyColor(difficulty)} mb-1">
+                                    ${difficulty}
+                                </span>
+                                <span class="text-gray-600">${opponent}</span>
+                                <span class="text-gray-400">${venue}</span>
+                            </div>
+                        </td>
+                    `;
+                } else {
+                    html += '<td class="px-2 py-2 text-center">-</td>';
+                }
+            });
+            
+            html += '</tr>';
+        });
+        
+        html += '</tbody></table>';
+        fdrMatrix.innerHTML = html;
+    }
+    
+    // Render Calendar View
+    function renderCalendar() {
+        const calendarContent = document.getElementById('calendarContent');
+        calendarContent.innerHTML = '<p class="text-center text-gray-500">กำลังพัฒนา Calendar View...</p>';
+    }
+    
+    // Toggle between different views
+    function toggleView() {
+        [fixturesView, matrixView, calendarView].forEach(view => {
+            view.classList.add('hidden');
+        });
+        
+        const viewMode = viewModeSelect.value;
+        switch (viewMode) {
+            case 'fixtures':
+                fixturesView.classList.remove('hidden');
+                break;
+            case 'matrix':
+                matrixView.classList.remove('hidden');
+                break;
+            case 'calendar':
+                calendarView.classList.remove('hidden');
+                break;
+        }
+        
+        if (currentFixtures.length > 0) {
+            renderCurrentView();
+        }
+    }
+    
+    // Show different states
+    function showState(state) {
+        [loadingState, errorState, defaultState, resultsSection].forEach(el => {
+            el.classList.add('hidden');
+        });
+        
+        switch (state) {
+            case 'loading':
+                loadingState.classList.remove('hidden');
+                break;
+            case 'error':
+                errorState.classList.remove('hidden');
+                break;
+            case 'results':
+                resultsSection.classList.remove('hidden');
+                break;
+            default:
+                defaultState.classList.remove('hidden');
+        }
+    }
+    
+    // Utility functions
+    function getDifficultyColor(difficulty) {
+        if (difficulty <= 2) return 'bg-green-100 text-green-800';
+        if (difficulty === 3) return 'bg-yellow-100 text-yellow-800';
+        return 'bg-red-100 text-red-800';
+    }
+    
+    function formatDateTime(dateString) {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('th-TH', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    }
+    
+    // Initialize with default state
+    showState('default');
+});
+</script>
+{% endblock %}
