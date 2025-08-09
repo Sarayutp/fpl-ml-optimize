@@ -1,0 +1,857 @@
+{% extends "base.html" %}
+
+{% block title %}Suggest Chip - FPL AI Optimizer{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50 py-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-900 mb-4">🎯 Smart Chip Recommendations</h1>
+            <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                วิเคราะห์ทีมของคุณและแนะนำการใช้ Chip ที่เหมาะสมที่สุดตาม Gameweek และฟิกซ์เจอร์
+            </p>
+        </div>
+
+        <!-- Team Input Section -->
+        <div class="bg-white rounded-xl shadow-lg p-8 mb-8">
+            <h2 class="text-2xl font-bold text-gray-900 mb-6">📋 ใส่ทีมปัจจุบันของคุณ</h2>
+            
+            <form id="team-form" class="space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <!-- Current Gameweek -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Gameweek ปัจจุบัน
+                        </label>
+                        <select id="current-gameweek" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="">เลือก Gameweek</option>
+                            <!-- Options 1-38 will be populated by JavaScript -->
+                        </select>
+                    </div>
+
+                    <!-- Available Budget -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            งบประมาณที่เหลือ (£M)
+                        </label>
+                        <input type="number" id="available-budget" step="0.1" min="0" max="20" 
+                               placeholder="0.0" 
+                               class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                </div>
+
+                <!-- Chips Used -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-3">
+                        Chip ที่ใช้แล้ว
+                    </label>
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                        <label class="flex items-center space-x-3">
+                            <input type="checkbox" id="wildcard1-used" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                            <span class="text-sm text-gray-700">Wildcard 1st Half</span>
+                        </label>
+                        <label class="flex items-center space-x-3">
+                            <input type="checkbox" id="wildcard2-used" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                            <span class="text-sm text-gray-700">Wildcard 2nd Half</span>
+                        </label>
+                        <label class="flex items-center space-x-3">
+                            <input type="checkbox" id="benchboost-used" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                            <span class="text-sm text-gray-700">Bench Boost</span>
+                        </label>
+                        <label class="flex items-center space-x-3">
+                            <input type="checkbox" id="triplecaptain-used" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                            <span class="text-sm text-gray-700">Triple Captain</span>
+                        </label>
+                        <label class="flex items-center space-x-3">
+                            <input type="checkbox" id="freehit-used" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                            <span class="text-sm text-gray-700">Free Hit</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Team Selection -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-3">
+                        ทีมปัจจุบัน (15 ผู้เล่น)
+                    </label>
+                    <div class="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-6">
+                        <div class="text-center">
+                            <div class="text-gray-500 mb-4">
+                                <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                                    <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                            </div>
+                            <p class="text-gray-600">คลิกเพื่อเลือกผู้เล่น หรือนำเข้าจาก Team Optimizer</p>
+                            <button type="button" id="import-from-optimizer" class="mt-4 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors">
+                                นำเข้าจาก Optimizer
+                            </button>
+                        </div>
+                        <div id="selected-team" class="hidden mt-6">
+                            <!-- Selected team will be displayed here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="text-center">
+                    <button type="submit" id="analyze-button" 
+                            class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-8 py-3 rounded-lg font-semibold hover:from-indigo-700 hover:to-purple-700 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">
+                        🔍 วิเคราะห์และแนะนำ Chip
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Recommendations Section (Hidden initially) -->
+        <div id="recommendations-section" class="hidden">
+            <!-- Current Gameweek Recommendation -->
+            <div class="bg-white rounded-xl shadow-lg p-8 mb-8 border-l-4 border-green-500">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6">🎯 แนะนำสำหรับ Gameweek นี้</h2>
+                <div id="current-week-recommendation" class="space-y-4">
+                    <!-- Will be populated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Future Planning -->
+            <div class="bg-white rounded-xl shadow-lg p-8 mb-8 border-l-4 border-blue-500">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6">🔮 การวางแผนล่วงหน้า</h2>
+                <div id="future-planning" class="space-y-6">
+                    <!-- Will be populated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Team Strength Analysis -->
+            <div class="bg-white rounded-xl shadow-lg p-8 mb-8 border-l-4 border-purple-500">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6">💪 การวิเคราะห์ความแข็งแกร่งของทีม</h2>
+                <div id="team-strength-analysis" class="space-y-4">
+                    <!-- Will be populated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Fixture Analysis -->
+            <div class="bg-white rounded-xl shadow-lg p-8">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6">📊 การวิเคราะห์ฟิกซ์เจอร์</h2>
+                <div id="fixture-analysis" class="space-y-4">
+                    <!-- Will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Player Selection Modal -->
+<div id="player-selection-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 hidden">
+    <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-6xl shadow-lg rounded-md bg-white">
+        <div class="mt-3">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">เลือกผู้เล่น</h3>
+                <button id="close-player-modal" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                <!-- Position-based player selection -->
+                <div class="space-y-4">
+                    <h4 class="font-semibold text-gray-800">Goalkeepers (2)</h4>
+                    <div id="gkp-selection" class="space-y-2 max-h-48 overflow-y-auto">
+                        <!-- Will be populated -->
+                    </div>
+                </div>
+                
+                <div class="space-y-4">
+                    <h4 class="font-semibold text-gray-800">Defenders (5)</h4>
+                    <div id="def-selection" class="space-y-2 max-h-48 overflow-y-auto">
+                        <!-- Will be populated -->
+                    </div>
+                </div>
+                
+                <div class="space-y-4">
+                    <h4 class="font-semibold text-gray-800">Midfielders (5)</h4>
+                    <div id="mid-selection" class="space-y-2 max-h-48 overflow-y-auto">
+                        <!-- Will be populated -->
+                    </div>
+                </div>
+                
+                <div class="space-y-4">
+                    <h4 class="font-semibold text-gray-800">Forwards (3)</h4>
+                    <div id="fwd-selection" class="space-y-2 max-h-48 overflow-y-auto">
+                        <!-- Will be populated -->
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex items-center justify-between mt-6 pt-4 border-t">
+                <div class="text-sm text-gray-600">
+                    Selected: <span id="selected-count">0</span>/15 players
+                </div>
+                <div class="space-x-3">
+                    <button id="confirm-team-selection" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50">
+                        ยืนยันทีม
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+class ChipSuggestionEngine {
+    constructor() {
+        this.currentTeam = [];
+        this.currentGameweek = null;
+        this.availableBudget = 0;
+        this.usedChips = {
+            wildcard1: false,
+            wildcard2: false,
+            benchBoost: false,
+            tripleCaptain: false,
+            freeHit: false
+        };
+        this.players = [];
+        this.fixtures = [];
+        
+        this.init();
+    }
+    
+    async init() {
+        this.setupEventListeners();
+        this.populateGameweeks();
+        await this.loadPlayers();
+    }
+    
+    setupEventListeners() {
+        // Form submission
+        document.getElementById('team-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.analyzeAndRecommend();
+        });
+        
+        // Import from optimizer
+        document.getElementById('import-from-optimizer').addEventListener('click', () => {
+            this.showPlayerSelectionModal();
+        });
+        
+        // Modal controls
+        document.getElementById('close-player-modal').addEventListener('click', () => {
+            this.hidePlayerSelectionModal();
+        });
+        
+        document.getElementById('confirm-team-selection').addEventListener('click', () => {
+            this.confirmTeamSelection();
+        });
+        
+        // Update used chips
+        ['wildcard1-used', 'wildcard2-used', 'benchboost-used', 'triplecaptain-used', 'freehit-used'].forEach(id => {
+            document.getElementById(id).addEventListener('change', (e) => {
+                const chipName = id.replace('-used', '').replace('1', '').replace('2', '');
+                if (id.includes('wildcard1')) {
+                    this.usedChips.wildcard1 = e.target.checked;
+                } else if (id.includes('wildcard2')) {
+                    this.usedChips.wildcard2 = e.target.checked;
+                } else {
+                    this.usedChips[chipName.replace('benchboost', 'benchBoost').replace('triplecaptain', 'tripleCaptain').replace('freehit', 'freeHit')] = e.target.checked;
+                }
+            });
+        });
+    }
+    
+    populateGameweeks() {
+        const select = document.getElementById('current-gameweek');
+        for (let i = 1; i <= 38; i++) {
+            const option = document.createElement('option');
+            option.value = i;
+            option.textContent = `Gameweek ${i}`;
+            select.appendChild(option);
+        }
+    }
+    
+    async loadPlayers() {
+        try {
+            const response = await fetch('/api/players');
+            const data = await response.json();
+            this.players = data.players || [];
+        } catch (error) {
+            console.error('Error loading players:', error);
+            showToast('Error loading players', 'error');
+        }
+    }
+    
+    showPlayerSelectionModal() {
+        document.getElementById('player-selection-modal').classList.remove('hidden');
+        this.populatePlayerSelection();
+    }
+    
+    hidePlayerSelectionModal() {
+        document.getElementById('player-selection-modal').classList.add('hidden');
+    }
+    
+    populatePlayerSelection() {
+        const positions = {
+            'GKP': { container: 'gkp-selection', limit: 2, selected: 0 },
+            'DEF': { container: 'def-selection', limit: 5, selected: 0 },
+            'MID': { container: 'mid-selection', limit: 5, selected: 0 },
+            'FWD': { container: 'fwd-selection', limit: 3, selected: 0 }
+        };
+        
+        // Group players by position
+        const playersByPosition = {};
+        this.players.forEach(player => {
+            if (!playersByPosition[player.position]) {
+                playersByPosition[player.position] = [];
+            }
+            playersByPosition[player.position].push(player);
+        });
+        
+        // Populate each position
+        Object.keys(positions).forEach(position => {
+            const container = document.getElementById(positions[position].container);
+            container.innerHTML = '';
+            
+            if (playersByPosition[position]) {
+                playersByPosition[position]
+                    .sort((a, b) => (b.total_points || 0) - (a.total_points || 0))
+                    .slice(0, 20) // Show top 20 players per position
+                    .forEach(player => {
+                        const playerDiv = document.createElement('div');
+                        playerDiv.className = 'flex items-center space-x-2 p-2 rounded border hover:bg-gray-50 cursor-pointer';
+                        playerDiv.innerHTML = `
+                            <input type="checkbox" class="player-checkbox" data-player-id="${player.id}" data-position="${position}">
+                            <div class="flex-1 text-sm">
+                                <div class="font-medium">${player.web_name}</div>
+                                <div class="text-gray-500">£${player.now_cost/10}M • ${player.total_points || 0} pts</div>
+                            </div>
+                        `;
+                        container.appendChild(playerDiv);
+                    });
+            }
+        });
+        
+        // Add change listeners to checkboxes
+        document.querySelectorAll('.player-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', () => this.updateSelectedCount());
+        });
+    }
+    
+    updateSelectedCount() {
+        const selected = document.querySelectorAll('.player-checkbox:checked').length;
+        document.getElementById('selected-count').textContent = selected;
+        
+        const confirmButton = document.getElementById('confirm-team-selection');
+        confirmButton.disabled = selected !== 15;
+    }
+    
+    confirmTeamSelection() {
+        const selectedCheckboxes = document.querySelectorAll('.player-checkbox:checked');
+        this.currentTeam = Array.from(selectedCheckboxes).map(checkbox => {
+            const playerId = parseInt(checkbox.dataset.playerId);
+            return this.players.find(p => p.id === playerId);
+        });
+        
+        this.displaySelectedTeam();
+        this.hidePlayerSelectionModal();
+    }
+    
+    displaySelectedTeam() {
+        const container = document.getElementById('selected-team');
+        const uploadArea = container.previousElementSibling;
+        
+        uploadArea.classList.add('hidden');
+        container.classList.remove('hidden');
+        
+        // Group by position
+        const teamByPosition = {
+            'GKP': [],
+            'DEF': [],
+            'MID': [],
+            'FWD': []
+        };
+        
+        this.currentTeam.forEach(player => {
+            teamByPosition[player.position].push(player);
+        });
+        
+        let html = '<div class="grid grid-cols-1 md:grid-cols-4 gap-4">';
+        
+        Object.keys(teamByPosition).forEach(position => {
+            const positionName = {
+                'GKP': 'Goalkeepers',
+                'DEF': 'Defenders', 
+                'MID': 'Midfielders',
+                'FWD': 'Forwards'
+            }[position];
+            
+            html += `
+                <div>
+                    <h4 class="font-semibold text-gray-800 mb-2">${positionName}</h4>
+                    <div class="space-y-1">
+            `;
+            
+            teamByPosition[position].forEach(player => {
+                html += `
+                    <div class="text-sm p-2 bg-white rounded border">
+                        <div class="font-medium">${player.web_name}</div>
+                        <div class="text-gray-500 text-xs">£${player.now_cost/10}M • ${player.total_points || 0} pts</div>
+                    </div>
+                `;
+            });
+            
+            html += '</div></div>';
+        });
+        
+        html += '</div>';
+        html += `
+            <div class="mt-4 text-center">
+                <button type="button" id="change-team" class="text-indigo-600 hover:text-indigo-800 underline">
+                    เปลี่ยนทีม
+                </button>
+            </div>
+        `;
+        
+        container.innerHTML = html;
+        
+        // Add event listener for change team
+        document.getElementById('change-team').addEventListener('click', () => {
+            this.showPlayerSelectionModal();
+        });
+    }
+    
+    async analyzeAndRecommend() {
+        const gameweek = parseInt(document.getElementById('current-gameweek').value);
+        const budget = parseFloat(document.getElementById('available-budget').value) || 0;
+        
+        if (!gameweek) {
+            showToast('กรุณาเลือก Gameweek', 'error');
+            return;
+        }
+        
+        if (this.currentTeam.length !== 15) {
+            showToast('กรุณาเลือกผู้เล่น 15 คน', 'error');
+            return;
+        }
+        
+        this.currentGameweek = gameweek;
+        this.availableBudget = budget;
+        
+        showLoading();
+        
+        try {
+            // Get chip recommendations
+            const recommendations = await this.getChipRecommendations();
+            this.displayRecommendations(recommendations);
+            
+            // Show recommendations section
+            document.getElementById('recommendations-section').classList.remove('hidden');
+            
+            // Scroll to recommendations
+            document.getElementById('recommendations-section').scrollIntoView({ 
+                behavior: 'smooth' 
+            });
+            
+        } catch (error) {
+            console.error('Error analyzing team:', error);
+            showToast('เกิดข้อผิดพลาดในการวิเคราะห์', 'error');
+        } finally {
+            hideLoading();
+        }
+    }
+    
+    async getChipRecommendations() {
+        // Call the backend API for intelligent chip recommendations
+        try {
+            const team_players = this.currentTeam.map(player => player.id);
+            
+            const requestData = {
+                current_gameweek: this.currentGameweek,
+                team_players: team_players,
+                available_budget: this.availableBudget,
+                used_chips: this.usedChips
+            };
+            
+            const response = await fetch('/api/chip-recommendations', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestData)
+            });
+            
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.error || `HTTP ${response.status}`);
+            }
+            
+            return {
+                current_week: data.current_week_recommendation,
+                future_planning: data.future_planning,
+                fixture_analysis: data.fixture_analysis,
+                team_strength: data.team_strength
+            };
+            
+        } catch (error) {
+            console.error('API Error:', error);
+            showToast('ไม่สามารถเชื่อมต่อ API ได้ ใช้การวิเคราะห์แบบ Offline', 'warning');
+            // Fallback to client-side logic if API fails
+            return this.getChipRecommendationsFallback();
+        }
+    }
+    
+    getChipRecommendationsFallback() {
+        // Fallback client-side logic based on the strategy guide
+        const season_progress = this.currentGameweek / 38;
+        const recommendations = {
+            current_week: null,
+            future_planning: [],
+            fixture_analysis: null
+        };
+        
+        // Analyze current gameweek
+        recommendations.current_week = this.analyzeCurrentGameweek();
+        
+        // Plan future chips
+        recommendations.future_planning = this.planFutureChips();
+        
+        // Fixture analysis
+        recommendations.fixture_analysis = {
+            dgw_coming: this.currentGameweek >= 25,
+            bgw_coming: this.currentGameweek >= 28,
+            recommendation: 'กำลังวิเคราะห์ฟิกซ์เจอร์ด้วยข้อมูลพื้นฐาน...'
+        };
+        
+        return recommendations;
+    }
+    
+    analyzeCurrentGameweek() {
+        const gw = this.currentGameweek;
+        
+        // Early season strategy (GW 1-10)
+        if (gw <= 10) {
+            if (!this.usedChips.wildcard1 && gw >= 4) {
+                return {
+                    chip: 'wildcard',
+                    reason: 'ช่วงเวลาที่เหมาะสมในการใช้ Wildcard ครั้งแรก หลังจากมีข้อมูลฟอร์มผู้เล่น 3-4 สัปดาห์แล้ว',
+                    confidence: 0.8,
+                    alternative: 'save_transfer'
+                };
+            } else {
+                return {
+                    chip: 'save_transfer',
+                    reason: 'ช่วงต้นฤดูกาลยังเก็บ Chip ไว้ เน้นการสังเกตฟอร์มผู้เล่น',
+                    confidence: 0.9,
+                    alternative: null
+                };
+            }
+        }
+        
+        // Mid season (GW 11-25)
+        else if (gw <= 25) {
+            return {
+                chip: 'save_transfer', 
+                reason: 'ช่วงกลางฤดูกาลควรเก็บ Chip ไว้ เตรียมพร้อมสำหรับ DGW/BGW ในช่วงท้ายฤดูกาล',
+                confidence: 0.95,
+                alternative: 'free_hit'
+            };
+        }
+        
+        // Late season (GW 26+) - DGW/BGW period
+        else {
+            // This is where the main chip usage happens
+            if (!this.usedChips.benchBoost) {
+                return {
+                    chip: 'bench_boost',
+                    reason: 'ช่วงท้ายฤดูกาลที่มี Double Gameweek เหมาะสำหรับ Bench Boost',
+                    confidence: 0.85,
+                    alternative: 'triple_captain'
+                };
+            } else if (!this.usedChips.tripleCaptain) {
+                return {
+                    chip: 'triple_captain',
+                    reason: 'ใช้ Triple Captain กับกองหน้าดาราในช่วงที่มีฟิกซ์เจอร์ง่าย',
+                    confidence: 0.8,
+                    alternative: 'free_hit'
+                };
+            } else if (!this.usedChips.freeHit) {
+                return {
+                    chip: 'free_hit',
+                    reason: 'ใช้ Free Hit ใน Blank Gameweek เพื่อหลีกเลี่ยงผู้เล่นที่ไม่มีเกม',
+                    confidence: 0.9,
+                    alternative: 'save_transfer'
+                };
+            }
+        }
+        
+        return {
+            chip: 'save_transfer',
+            reason: 'ไม่มี Chip ที่เหมาะสมในสัปดาห์นี้',
+            confidence: 0.7,
+            alternative: null
+        };
+    }
+    
+    planFutureChips() {
+        const plans = [];
+        const remainingGWs = 38 - this.currentGameweek;
+        
+        // Wildcard 2nd half planning
+        if (!this.usedChips.wildcard2 && this.currentGameweek >= 20) {
+            plans.push({
+                gameweek: this.currentGameweek + 2,
+                chip: 'wildcard',
+                reason: 'ใช้ Wildcard 1-2 สัปดาห์ก่อน DGW ใหญ่เพื่อตั้งทีมสำหรับ Bench Boost',
+                priority: 'high'
+            });
+        }
+        
+        // Bench Boost planning
+        if (!this.usedChips.benchBoost && this.currentGameweek >= 25) {
+            plans.push({
+                gameweek: this.currentGameweek + 4,
+                chip: 'bench_boost', 
+                reason: 'ใช้ใน DGW ใหญ่ที่สุดของฤดูกาล เพื่อให้ผู้เล่น 15 คนได้ลงเล่น 2 นัด',
+                priority: 'high'
+            });
+        }
+        
+        // Triple Captain planning
+        if (!this.usedChips.tripleCaptain && this.currentGameweek >= 20) {
+            plans.push({
+                gameweek: this.currentGameweek + 6,
+                chip: 'triple_captain',
+                reason: 'ใช้กับดาราดังในช่วงที่มี DGW และเจอทีมอ่อน',
+                priority: 'medium'
+            });
+        }
+        
+        // Free Hit planning  
+        if (!this.usedChips.freeHit && this.currentGameweek >= 28) {
+            plans.push({
+                gameweek: this.currentGameweek + 8,
+                chip: 'free_hit',
+                reason: 'ใช้ใน BGW ที่มีทีมเล่นน้อย เพื่อหลีกเลี่ยงผู้เล่นที่ไม่มีเกม',
+                priority: 'medium'
+            });
+        }
+        
+        return plans.sort((a, b) => a.gameweek - b.gameweek);
+    }
+    
+    async analyzeFixtures() {
+        // Simulate fixture analysis
+        return {
+            dgw_coming: this.currentGameweek >= 25,
+            bgw_coming: this.currentGameweek >= 28,
+            easy_fixtures: ['Manchester City', 'Arsenal'],
+            tough_fixtures: ['Liverpool', 'Manchester United'],
+            recommendation: 'วิเคราะห์ฟิกซ์เจอร์แล้ว พบว่ามี Double Gameweek ในอีก 3-4 สัปดาห์ข้างหน้า เหมาะสำหรับการใช้ Bench Boost'
+        };
+    }
+    
+    displayRecommendations(recommendations) {
+        this.displayCurrentWeekRecommendation(recommendations.current_week);
+        this.displayFuturePlanning(recommendations.future_planning);
+        this.displayFixtureAnalysis(recommendations.fixture_analysis);
+        
+        // Display team strength if available
+        if (recommendations.team_strength) {
+            this.displayTeamStrength(recommendations.team_strength);
+        }
+    }
+    
+    displayCurrentWeekRecommendation(recommendation) {
+        const container = document.getElementById('current-week-recommendation');
+        
+        const chipIcons = {
+            'wildcard': '🃏',
+            'bench_boost': '🚀',
+            'triple_captain': '©️',
+            'free_hit': '🔄',
+            'save_transfer': '💾'
+        };
+        
+        const chipNames = {
+            'wildcard': 'Wildcard',
+            'bench_boost': 'Bench Boost',
+            'triple_captain': 'Triple Captain', 
+            'free_hit': 'Free Hit',
+            'save_transfer': 'เก็บ Transfer'
+        };
+        
+        const confidenceColor = recommendation.confidence >= 0.8 ? 'green' : 
+                                recommendation.confidence >= 0.6 ? 'yellow' : 'red';
+        
+        container.innerHTML = `
+            <div class="flex items-start space-x-4">
+                <div class="text-4xl">${chipIcons[recommendation.chip]}</div>
+                <div class="flex-1">
+                    <div class="flex items-center space-x-3 mb-2">
+                        <h3 class="text-xl font-semibold text-gray-900">
+                            ${chipNames[recommendation.chip]}
+                        </h3>
+                        <span class="bg-${confidenceColor}-100 text-${confidenceColor}-800 px-2 py-1 rounded-full text-xs font-medium">
+                            ${Math.round(recommendation.confidence * 100)}% แน่ใจ
+                        </span>
+                    </div>
+                    <p class="text-gray-700">${recommendation.reason}</p>
+                    ${recommendation.alternative ? `
+                        <p class="text-sm text-gray-500 mt-2">
+                            <strong>ทางเลือก:</strong> ${chipNames[recommendation.alternative]}
+                        </p>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    }
+    
+    displayFuturePlanning(plans) {
+        const container = document.getElementById('future-planning');
+        
+        if (plans.length === 0) {
+            container.innerHTML = '<p class="text-gray-500">ไม่มีแผนการใช้ Chip ในอนาคต</p>';
+            return;
+        }
+        
+        const chipIcons = {
+            'wildcard': '🃏',
+            'bench_boost': '🚀', 
+            'triple_captain': '©️',
+            'free_hit': '🔄'
+        };
+        
+        const chipNames = {
+            'wildcard': 'Wildcard',
+            'bench_boost': 'Bench Boost',
+            'triple_captain': 'Triple Captain',
+            'free_hit': 'Free Hit'
+        };
+        
+        let html = '';
+        plans.forEach(plan => {
+            const priorityColor = plan.priority === 'high' ? 'red' : 'blue';
+            
+            html += `
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center space-x-3">
+                            <span class="text-2xl">${chipIcons[plan.chip]}</span>
+                            <div>
+                                <h4 class="font-semibold text-gray-900">GW${plan.gameweek}: ${chipNames[plan.chip]}</h4>
+                                <span class="bg-${priorityColor}-100 text-${priorityColor}-800 px-2 py-1 rounded-full text-xs font-medium">
+                                    ${plan.priority === 'high' ? 'ความสำคัญสูง' : 'ความสำคัญปานกลาง'}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-gray-700 text-sm">${plan.reason}</p>
+                </div>
+            `;
+        });
+        
+        container.innerHTML = html;
+    }
+    
+    displayFixtureAnalysis(analysis) {
+        const container = document.getElementById('fixture-analysis');
+        
+        container.innerHTML = `
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 class="font-semibold text-blue-900 mb-2">📊 การวิเคราะห์ฟิกซ์เจอร์</h4>
+                <p class="text-blue-800 text-sm">${analysis.recommendation}</p>
+                
+                ${analysis.dgw_coming ? `
+                    <div class="mt-3 p-3 bg-green-100 rounded border border-green-200">
+                        <p class="text-green-800 text-sm">
+                            🎯 <strong>Double Gameweek กำลังมา!</strong> เตรียมพร้อมสำหรับ Bench Boost และ Triple Captain
+                        </p>
+                    </div>
+                ` : ''}
+                
+                ${analysis.bgw_coming ? `
+                    <div class="mt-3 p-3 bg-yellow-100 rounded border border-yellow-200">
+                        <p class="text-yellow-800 text-sm">
+                            ⚠️ <strong>Blank Gameweek กำลังมา!</strong> พิจารณาใช้ Free Hit
+                        </p>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    }
+    
+    displayTeamStrength(teamStrength) {
+        const container = document.getElementById('team-strength-analysis');
+        
+        const strengthColorMap = {
+            'excellent': 'green',
+            'good': 'blue',
+            'average': 'yellow',
+            'weak': 'red',
+            'unknown': 'gray'
+        };
+        
+        const strengthColor = strengthColorMap[teamStrength.strength_rating] || 'gray';
+        
+        container.innerHTML = `
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Overall Strength Score -->
+                <div class="bg-${strengthColor}-50 border border-${strengthColor}-200 rounded-lg p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold text-${strengthColor}-900">คะแนนรวม</h3>
+                        <div class="text-3xl font-bold text-${strengthColor}-700">
+                            ${teamStrength.strength_score}/100
+                        </div>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2.5 mb-3">
+                        <div class="bg-${strengthColor}-500 h-2.5 rounded-full" style="width: ${teamStrength.strength_score}%"></div>
+                    </div>
+                    <p class="text-${strengthColor}-800 text-sm">${teamStrength.description}</p>
+                </div>
+                
+                <!-- Performance Metrics -->
+                <div class="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">สถิติทีม</h3>
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600">ฟอร์มเฉลี่ย:</span>
+                            <span class="font-semibold text-gray-900">${teamStrength.avg_form}/10</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600">คะแนนเฉลี่ย:</span>
+                            <span class="font-semibold text-gray-900">${teamStrength.avg_points} pts</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600">การกระจายทีม:</span>
+                            <span class="font-semibold text-gray-900">${teamStrength.distribution_score}/100</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Team Distribution -->
+            ${Object.keys(teamStrength.team_distribution).length > 0 ? `
+                <div class="mt-6 bg-white border border-gray-200 rounded-lg p-4">
+                    <h4 class="font-semibold text-gray-900 mb-3">การกระจายผู้เล่นตามทีม</h4>
+                    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                        ${Object.entries(teamStrength.team_distribution).map(([team, count]) => `
+                            <div class="text-center p-2 bg-gray-50 rounded">
+                                <div class="text-sm font-medium text-gray-900">${team}</div>
+                                <div class="text-xs text-gray-500">${count} ผู้เล่น</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            ` : ''}
+        `;
+    }
+}
+
+// Initialize when page loads
+document.addEventListener('DOMContentLoaded', () => {
+    new ChipSuggestionEngine();
+});
+</script>
+{% endblock %}

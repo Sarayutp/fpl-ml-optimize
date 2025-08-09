@@ -4,6 +4,7 @@
 import os
 import sys
 import logging
+from datetime import datetime
 
 # Add the project root to the Python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -185,6 +186,16 @@ def create_production_app():
     def fdr():
         """Fixture Difficulty Rating page."""
         return render_template('fdr.html')
+    
+    @app.route('/chip-strategy')
+    def chip_strategy():
+        """Chip Strategy Guide page."""
+        return render_template('chip_strategy.html')
+    
+    @app.route('/suggest-chip')
+    def suggest_chip():
+        """Smart Chip Recommendation page."""
+        return render_template('suggest_chip.html')
     
     # API Routes
     @app.route('/api/health')
@@ -874,6 +885,307 @@ def create_production_app():
             traceback.print_exc()
             return jsonify({'success': False, 'error': str(e)}), 500
     
+    # Chip recommendation helper functions
+    def analyze_current_gameweek(current_gw: int, used_chips: dict, team_player_ids: list) -> dict:
+        """Analyze current gameweek and recommend best chip to use."""
+        season_progress = current_gw / 38.0
+        
+        # Early season (GW 1-10)
+        if current_gw <= 10:
+            if not used_chips.get('wildcard1', False) and current_gw >= 4:
+                return {
+                    'chip': 'wildcard',
+                    'reason': f'GW{current_gw}: ช่วงเวลาที่เหมาะสมในการใช้ Wildcard ครั้งแรก หลังจากมีข้อมูลฟอร์มผู้เล่น {current_gw-1} สัปดาห์แล้ว',
+                    'confidence': 0.8,
+                    'priority': 'medium',
+                    'alternative': 'save_transfer'
+                }
+            else:
+                return {
+                    'chip': 'save_transfer',
+                    'reason': 'ช่วงต้นฤดูกาลยังเก็บ Chip ไว้ เน้นการสังเกตฟอร์มผู้เล่นและการปรับตัวของทีม',
+                    'confidence': 0.9,
+                    'priority': 'low',
+                    'alternative': None
+                }
+        
+        # Mid season (GW 11-25)
+        elif current_gw <= 25:
+            return {
+                'chip': 'save_transfer',
+                'reason': f'GW{current_gw}: ช่วงกลางฤดูกาลควรเก็บ Chip สำคัญไว้ เตรียมพร้อมสำหรับ DGW/BGW ในช่วง GW 26+ ที่จะมีผลกำไรสูงสุด',
+                'confidence': 0.95,
+                'priority': 'low',
+                'alternative': 'wildcard' if not used_chips.get('wildcard1', False) else None
+            }
+        
+        # Late season (GW 26+) - Main chip usage period
+        else:
+            # Check for upcoming DGW (simulate - in real app would check fixtures)
+            upcoming_dgw = current_gw >= 28 and current_gw <= 35
+            upcoming_bgw = current_gw >= 30 and current_gw <= 37
+            
+            if not used_chips.get('wildcard2', False) and upcoming_dgw:
+                return {
+                    'chip': 'wildcard',
+                    'reason': f'GW{current_gw}: ใช้ Wildcard เพื่อตั้งทีมสำหรับ DGW ที่กำลังมา ให้มีผู้เล่น 15 คนที่เล่น 2 นัดเพื่อเตรียม Bench Boost',
+                    'confidence': 0.9,
+                    'priority': 'high',
+                    'alternative': 'save_transfer'
+                }
+            elif not used_chips.get('benchBoost', False) and upcoming_dgw:
+                return {
+                    'chip': 'bench_boost',
+                    'reason': f'GW{current_gw}: DGW ที่เหมาะสำหรับ Bench Boost - ผู้เล่นทั้ง 15 คนมีโอกาสได้คะแนนจาก 2 เกม',
+                    'confidence': 0.85,
+                    'priority': 'high',
+                    'alternative': 'triple_captain'
+                }
+            elif not used_chips.get('tripleCaptain', False):
+                return {
+                    'chip': 'triple_captain',
+                    'reason': f'GW{current_gw}: ช่วงท้ายฤดูกาล เหมาะกับการใช้ TC กับกองหน้าดาราที่มีฟอร์มดีและฟิกซ์เจอร์ง่าย',
+                    'confidence': 0.8,
+                    'priority': 'medium',
+                    'alternative': 'free_hit'
+                }
+            elif not used_chips.get('freeHit', False) and upcoming_bgw:
+                return {
+                    'chip': 'free_hit',
+                    'reason': f'GW{current_gw}: BGW กำลังมา - ใช้ Free Hit เพื่อหลีกเลี่ยงผู้เล่นที่ไม่มีเกม โดยไม่กระทบทีมหลัก',
+                    'confidence': 0.9,
+                    'priority': 'high',
+                    'alternative': 'save_transfer'
+                }
+        
+        return {
+            'chip': 'save_transfer',
+            'reason': f'GW{current_gw}: ไม่มี Chip ที่เหมาะสมในสัปดาห์นี้ แนะนำเก็บไว้ใช้ในโอกาสที่ดีกว่า',
+            'confidence': 0.7,
+            'priority': 'low',
+            'alternative': None
+        }
+
+    def plan_future_chips(current_gw: int, used_chips: dict) -> list:
+        """Plan future chip usage based on season calendar."""
+        plans = []
+        
+        # Wildcard 2nd half planning
+        if not used_chips.get('wildcard2', False) and current_gw >= 19:
+            target_gw = min(current_gw + 3, 35)
+            plans.append({
+                'gameweek': target_gw,
+                'chip': 'wildcard',
+                'reason': f'ใช้ Wildcard เพื่อรีเซ็ตทีมสำหรับช่วงท้ายฤดูกาล และเตรียมทีมสำหรับ Bench Boost ใน DGW',
+                'priority': 'high',
+                'weeks_away': target_gw - current_gw
+            })
+        
+        # Bench Boost planning
+        if not used_chips.get('benchBoost', False) and current_gw <= 35:
+            target_gw = min(current_gw + 6, 36)
+            plans.append({
+                'gameweek': target_gw,
+                'chip': 'bench_boost',
+                'reason': f'ใช้ใน DGW ใหญ่ที่สุดของฤดูกาล เมื่อมีผู้เล่น 15 คนที่ลงเล่น 2 นัด (ควรใช้หลัง Wildcard)',
+                'priority': 'high',
+                'weeks_away': target_gw - current_gw
+            })
+        
+        # Triple Captain planning
+        if not used_chips.get('tripleCaptain', False) and current_gw <= 36:
+            target_gw = min(current_gw + 4, 37)
+            plans.append({
+                'gameweek': target_gw,
+                'chip': 'triple_captain',
+                'reason': f'ใช้กับดาราดังที่มี DGW และเจอทีมอ่อน (ดู Haaland, Salah, Kane หรือกองหน้าท็อป)',
+                'priority': 'medium',
+                'weeks_away': target_gw - current_gw
+            })
+        
+        # Free Hit planning
+        if not used_chips.get('freeHit', False) and current_gw <= 37:
+            target_gw = min(current_gw + 8, 37)
+            plans.append({
+                'gameweek': target_gw,
+                'chip': 'free_hit',
+                'reason': f'ใช้ใน BGW ที่มีทีมเล่นน้อยที่สุด เพื่อหลีกเลี่ยงผู้เล่นที่ไม่มีเกม',
+                'priority': 'medium',
+                'weeks_away': target_gw - current_gw
+            })
+        
+        # Sort by gameweek
+        plans.sort(key=lambda x: x['gameweek'])
+        return plans
+
+    def analyze_upcoming_fixtures(current_gw: int, team_player_ids: list) -> dict:
+        """Analyze upcoming fixtures to identify DGW/BGW opportunities."""
+        
+        # In real implementation, this would query actual fixture data
+        # For now, simulate based on typical FPL calendar
+        
+        dgw_coming = current_gw >= 25 and current_gw <= 35
+        bgw_coming = current_gw >= 28 and current_gw <= 37
+        
+        # Simulate fixture difficulty
+        easy_fixtures = []
+        tough_fixtures = []
+        
+        try:
+            # Get team names for the players
+            players = Player.query.filter(Player.id.in_(team_player_ids)).all()
+            team_names = list(set([player.team_name for player in players if player.team_name]))
+            
+            # Simulate upcoming opponents (in real app, would query fixture table)
+            if len(team_names) > 0:
+                easy_fixtures = ['Newcastle', 'Burnley', 'Sheffield United']
+                tough_fixtures = ['Manchester City', 'Liverpool', 'Arsenal']
+        except:
+            pass
+        
+        recommendation = ""
+        if dgw_coming and bgw_coming:
+            recommendation = f"GW{current_gw + 3}-{current_gw + 8} จะมีทั้ง DGW และ BGW - วางแผนใช้ Wildcard, Bench Boost และ Free Hit อย่างระมัดระวัง"
+        elif dgw_coming:
+            recommendation = f"DGW กำลังมาใน GW{current_gw + 3}-{current_gw + 6} - เตรียมพร้อมสำหรับ Bench Boost และ Triple Captain"
+        elif bgw_coming:
+            recommendation = f"BGW กำลังมาใน GW{current_gw + 5}-{current_gw + 9} - พิจารณาใช้ Free Hit"
+        else:
+            recommendation = "ช่วงนี้ฟิกซ์เจอร์ปกติ - เก็บ Chip ไว้สำหรับ DGW/BGW ข้างหน้า"
+        
+        return {
+            'dgw_coming': dgw_coming,
+            'bgw_coming': bgw_coming,
+            'dgw_gameweeks': list(range(max(current_gw, 28), min(current_gw + 10, 36))),
+            'bgw_gameweeks': list(range(max(current_gw, 30), min(current_gw + 8, 37))),
+            'easy_fixtures': easy_fixtures,
+            'tough_fixtures': tough_fixtures,
+            'recommendation': recommendation,
+            'fixture_rating': 'good' if dgw_coming else 'normal'
+        }
+
+    def calculate_team_fixture_strength(team_player_ids: list, current_gw: int) -> dict:
+        """Calculate how well current team is positioned for upcoming fixtures."""
+        try:
+            players = Player.query.filter(Player.id.in_(team_player_ids)).all()
+            
+            # Group by team
+            teams_count = {}
+            total_form = 0
+            total_points = 0
+            
+            for player in players:
+                team = player.team_name or 'Unknown'
+                teams_count[team] = teams_count.get(team, 0) + 1
+                total_form += float(player.form or 0)
+                total_points += float(player.total_points or 0)
+            
+            avg_form = total_form / len(players) if players else 0
+            avg_points = total_points / len(players) if players else 0
+            
+            # Evaluate team distribution
+            distribution_score = len(teams_count) / 20.0  # Max 20 teams
+            
+            # Overall strength assessment
+            strength_score = (avg_form * 0.3 + avg_points * 0.7) / 20.0  # Normalize
+            
+            if strength_score >= 0.7:
+                strength_rating = 'excellent'
+                strength_desc = 'ทีมแข็งแกร่งมาก เหมาะกับการใช้ Bench Boost'
+            elif strength_score >= 0.5:
+                strength_rating = 'good'
+                strength_desc = 'ทีมดี สามารถใช้ Triple Captain ได้'
+            elif strength_score >= 0.3:
+                strength_rating = 'average'
+                strength_desc = 'ทีมปานกลาง อาจต้อง Wildcard เพื่อปรับปรุง'
+            else:
+                strength_rating = 'weak'
+                strength_desc = 'ทีมอ่อน แนะนำ Wildcard ด่วน'
+            
+            return {
+                'strength_score': round(strength_score * 100, 1),
+                'strength_rating': strength_rating,
+                'description': strength_desc,
+                'avg_form': round(avg_form, 1),
+                'avg_points': round(avg_points, 1),
+                'team_distribution': teams_count,
+                'distribution_score': round(distribution_score * 100, 1)
+            }
+            
+        except Exception as e:
+            print(f"Error calculating team strength: {e}")
+            return {
+                'strength_score': 50.0,
+                'strength_rating': 'unknown',
+                'description': 'ไม่สามารถวิเคราะห์ความแข็งแกร่งของทีมได้',
+                'avg_form': 0,
+                'avg_points': 0,
+                'team_distribution': {},
+                'distribution_score': 50.0
+            }
+
+    @app.route('/api/chip-recommendations', methods=['POST'])
+    def get_chip_recommendations():
+        """Get smart chip usage recommendations based on current team and gameweek."""
+        try:
+            print("🎯 [DEBUG] Chip recommendations requested...")
+            data = request.json
+            
+            if not data:
+                return jsonify({'success': False, 'error': 'ไม่พบข้อมูล'}), 400
+            
+            # Extract request data
+            current_gameweek = data.get('current_gameweek')
+            team_player_ids = data.get('team_players', [])
+            available_budget = data.get('available_budget', 0.0)
+            used_chips = data.get('used_chips', {})
+            
+            if not current_gameweek:
+                return jsonify({'success': False, 'error': 'กรุณาระบุ Gameweek ปัจจุบัน'}), 400
+            
+            if not team_player_ids or len(team_player_ids) != 15:
+                return jsonify({'success': False, 'error': 'กรุณาเลือกผู้เล่น 15 คน'}), 400
+            
+            # Get optimization service
+            optimization_service = OptimizationService()
+            
+            # Analyze current gameweek recommendation
+            current_week_rec = analyze_current_gameweek(
+                current_gameweek, used_chips, team_player_ids
+            )
+            
+            # Plan future chips
+            future_planning = plan_future_chips(
+                current_gameweek, used_chips
+            )
+            
+            # Get fixture analysis
+            fixture_analysis = analyze_upcoming_fixtures(
+                current_gameweek, team_player_ids
+            )
+            
+            # Calculate team strength for current fixtures
+            team_strength = calculate_team_fixture_strength(
+                team_player_ids, current_gameweek
+            )
+            
+            response = {
+                'success': True,
+                'current_gameweek': current_gameweek,
+                'current_week_recommendation': current_week_rec,
+                'future_planning': future_planning,
+                'fixture_analysis': fixture_analysis,
+                'team_strength': team_strength,
+                'generated_at': datetime.now().isoformat()
+            }
+            
+            print(f"✅ [DEBUG] Chip recommendations generated successfully")
+            return jsonify(response)
+            
+        except Exception as e:
+            print(f"❌ [DEBUG] Chip recommendations error: {e}")
+            return jsonify({'success': False, 'error': f'เกิดข้อผิดพลาด: {str(e)}'}), 500
+
     # Error handlers
     @app.errorhandler(404)
     def not_found(error):

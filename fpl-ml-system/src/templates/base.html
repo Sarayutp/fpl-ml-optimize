@@ -47,6 +47,14 @@
                                    class="{% if request.endpoint == 'fdr' %}bg-indigo-700 text-white{% else %}text-indigo-100 hover:bg-indigo-500 hover:text-white{% endif %} rounded-md px-3 py-2 text-sm font-medium">
                                     FDR
                                 </a>
+                                <a href="{{ url_for('chip_strategy') }}" 
+                                   class="{% if request.endpoint == 'chip_strategy' %}bg-indigo-700 text-white{% else %}text-indigo-100 hover:bg-indigo-500 hover:text-white{% endif %} rounded-md px-3 py-2 text-sm font-medium">
+                                    🃏 Chip Guide
+                                </a>
+                                <a href="{{ url_for('suggest_chip') }}" 
+                                   class="{% if request.endpoint == 'suggest_chip' %}bg-indigo-700 text-white{% else %}text-indigo-100 hover:bg-indigo-500 hover:text-white{% endif %} rounded-md px-3 py-2 text-sm font-medium">
+                                    🎯 Suggest Chip
+                                </a>
                             </div>
                         </div>
                     </div>

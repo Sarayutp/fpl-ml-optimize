@@ -1,0 +1,328 @@
+{% extends "base.html" %}
+
+{% block title %}Chip Strategy Guide - FPL AI Optimizer{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50 py-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <!-- Header -->
+        <div class="text-center mb-12">
+            <h1 class="text-4xl font-bold text-gray-900 mb-4">🃏 FPL Chip Strategy Guide</h1>
+            <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                การใช้ Chip ให้เกิดประโยชน์สูงสุดนั้น ต้องอาศัยการวางแผนโดยอิงกับโปรแกรมการแข่งขัน โดยเฉพาะอย่างยิ่ง 
+                <span class="font-semibold text-indigo-600">"สัปดาห์ที่มีการแข่งขันสองนัด" (Double Gameweek - DGW)</span> และ 
+                <span class="font-semibold text-red-600">"สัปดาห์ที่ไม่มีการแข่งขัน" (Blank Gameweek - BGW)</span> 
+                ซึ่งมักจะเกิดขึ้นในช่วงครึ่งหลังของฤดูกาล
+            </p>
+        </div>
+
+        <!-- Chips Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+            <!-- Wildcard -->
+            <div class="bg-white rounded-xl shadow-lg overflow-hidden border-l-4 border-green-500">
+                <div class="bg-gradient-to-r from-green-500 to-green-600 p-6">
+                    <div class="flex items-center">
+                        <div class="text-4xl mr-4">🃏</div>
+                        <div>
+                            <h2 class="text-2xl font-bold text-white">Wildcard (WC)</h2>
+                            <p class="text-green-100">ไวลด์การ์ด - เปลี่ยนผู้เล่นได้ไม่จำกัดจำนวน</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-6">
+                    <div class="mb-6">
+                        <p class="text-gray-700 mb-4">
+                            <strong>หน้าที่:</strong> เปลี่ยนผู้เล่นได้ไม่จำกัดจำนวนโดยไม่เสียคะแนน (มีให้ใช้ 2 ครั้ง)
+                        </p>
+                    </div>
+
+                    <!-- Wildcard 1 -->
+                    <div class="mb-6 p-4 bg-green-50 rounded-lg border border-green-200">
+                        <h3 class="text-lg font-semibold text-green-800 mb-3">📅 Wildcard ครั้งที่ 1 (ครึ่งฤดูกาลแรก)</h3>
+                        <div class="space-y-2">
+                            <div class="flex items-start">
+                                <div class="text-green-600 text-sm font-medium w-24">เวลาที่ดี:</div>
+                                <div class="text-gray-700 text-sm">Gameweek 4-8</div>
+                            </div>
+                            <div class="flex items-start">
+                                <div class="text-green-600 text-sm font-medium w-24">เหตุผล:</div>
+                                <div class="text-gray-700 text-sm">มีข้อมูลมากพอที่จะเห็นฟอร์มผู้เล่นและทีมที่แท้จริง</div>
+                            </div>
+                            <div class="flex items-start">
+                                <div class="text-red-600 text-sm font-medium w-24">ระวัง:</div>
+                                <div class="text-gray-700 text-sm">อย่ารีบใช้เกินไป! การใช้ใน GW 2-3 มักเป็นการตัดสินใจที่ใช้อารมณ์</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Wildcard 2 -->
+                    <div class="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <h3 class="text-lg font-semibold text-blue-800 mb-3">🎯 Wildcard ครั้งที่ 2 (ครึ่งฤดูกาลหลัง)</h3>
+                        <div class="space-y-2">
+                            <div class="flex items-start">
+                                <div class="text-blue-600 text-sm font-medium w-24">เวลาที่ดี:</div>
+                                <div class="text-gray-700 text-sm">1-2 สัปดาห์ก่อน Double Gameweek (DGW) ครั้งใหญ่</div>
+                            </div>
+                            <div class="flex items-start">
+                                <div class="text-blue-600 text-sm font-medium w-24">เหตุผล:</div>
+                                <div class="text-gray-700 text-sm">เพื่อ "ตั้งทีม" สำหรับการใช้ Chip อื่นๆ โดยเฉพาะ Bench Boost</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bench Boost -->
+            <div class="bg-white rounded-xl shadow-lg overflow-hidden border-l-4 border-purple-500">
+                <div class="bg-gradient-to-r from-purple-500 to-purple-600 p-6">
+                    <div class="flex items-center">
+                        <div class="text-4xl mr-4">🚀</div>
+                        <div>
+                            <h2 class="text-2xl font-bold text-white">Bench Boost (BB)</h2>
+                            <p class="text-purple-100">เพิ่มพลังม้านั่งสำรอง</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-6">
+                    <div class="mb-6">
+                        <p class="text-gray-700 mb-4">
+                            <strong>หน้าที่:</strong> คะแนนของผู้เล่นบนม้านั่งสำรองทั้ง 4 คน จะถูกนับรวมในคะแนนของสัปดาห์นั้น
+                        </p>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div class="p-4 bg-purple-50 rounded-lg border border-purple-200">
+                            <div class="space-y-2">
+                                <div class="flex items-start">
+                                    <div class="text-purple-600 text-sm font-medium w-24">เวลาที่ดี:</div>
+                                    <div class="text-gray-700 text-sm">Double Gameweek (DGW) ครั้งใหญ่ที่สุดของฤดูกาล</div>
+                                </div>
+                                <div class="flex items-start">
+                                    <div class="text-purple-600 text-sm font-medium w-24">เหตุผล:</div>
+                                    <div class="text-gray-700 text-sm">เพื่อให้มีผู้เล่น 15 คนที่ได้ลงเล่น 2 นัด (โอกาสทำคะแนนสูงสุด)</div>
+                                </div>
+                                <div class="flex items-start">
+                                    <div class="text-purple-600 text-sm font-medium w-24">คู่หูที่ดี:</div>
+                                    <div class="text-gray-700 text-sm">Wildcard ครั้งที่ 2</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                            <div class="flex items-center mb-2">
+                                <div class="text-yellow-600 text-xl mr-2">💡</div>
+                                <div class="text-yellow-800 font-medium">เคล็ดลับ:</div>
+                            </div>
+                            <p class="text-yellow-800 text-sm">ใช้ Wildcard ก่อน 1-2 สัปดาห์เพื่อตั้งทีมที่มีผู้เล่น 15 คนใน DGW แล้วใช้ Bench Boost</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Triple Captain -->
+            <div class="bg-white rounded-xl shadow-lg overflow-hidden border-l-4 border-orange-500">
+                <div class="bg-gradient-to-r from-orange-500 to-orange-600 p-6">
+                    <div class="flex items-center">
+                        <div class="text-4xl mr-4">©️</div>
+                        <div>
+                            <h2 class="text-2xl font-bold text-white">Triple Captain (TC)</h2>
+                            <p class="text-orange-100">กัปตัน 3 เท่า</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-6">
+                    <div class="mb-6">
+                        <p class="text-gray-700 mb-4">
+                            <strong>หน้าที่:</strong> คะแนนของกัปตันทีมจะถูกคูณ 3 แทนที่จะเป็นคูณ 2
+                        </p>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div class="p-4 bg-orange-50 rounded-lg border border-orange-200">
+                            <div class="space-y-2">
+                                <div class="flex items-start">
+                                    <div class="text-orange-600 text-sm font-medium w-24">เวลาที่ดี:</div>
+                                    <div class="text-gray-700 text-sm">DGW ที่มีผู้เล่นระดับท็อปเจอกับทีมอ่อน 2 นัด</div>
+                                </div>
+                                <div class="flex items-start">
+                                    <div class="text-orange-600 text-sm font-medium w-24">เหตุผล:</div>
+                                    <div class="text-gray-700 text-sm">เพิ่มโอกาสทำคะแนนของกัปตันเป็นสองเท่าโดยธรรมชาติ</div>
+                                </div>
+                                <div class="flex items-start">
+                                    <div class="text-orange-600 text-sm font-medium w-24">สถานการณ์ในฝัน:</div>
+                                    <div class="text-gray-700 text-sm">กองหน้าระดับโลก (เช่น Haaland) ที่ฟอร์มดี และมีโปรแกรม DGW เล่นในบ้าน 2 นัด</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                            <div class="flex items-center mb-2">
+                                <div class="text-red-600 text-xl mr-2">⚠️</div>
+                                <div class="text-red-800 font-medium">ข้อควรระวัง:</div>
+                            </div>
+                            <p class="text-red-800 text-sm">หากผู้เล่นที่เลือกไม่ได้ลงเล่น จะได้ 0 คะแนน อย่าเสี่ยงกับผู้เล่นที่มีปัญหาการบาดเจ็บ</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Free Hit -->
+            <div class="bg-white rounded-xl shadow-lg overflow-hidden border-l-4 border-blue-500">
+                <div class="bg-gradient-to-r from-blue-500 to-blue-600 p-6">
+                    <div class="flex items-center">
+                        <div class="text-4xl mr-4">🔄</div>
+                        <div>
+                            <h2 class="text-2xl font-bold text-white">Free Hit (FH)</h2>
+                            <p class="text-blue-100">เปลี่ยนทีมฟรี 1 สัปดาห์</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-6">
+                    <div class="mb-6">
+                        <p class="text-gray-700 mb-4">
+                            <strong>หน้าที่:</strong> เปลี่ยนผู้เล่นได้ไม่จำกัดจำนวนสำหรับ 1 สัปดาห์เท่านั้น
+                        </p>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div class="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                            <div class="space-y-2">
+                                <div class="flex items-start">
+                                    <div class="text-blue-600 text-sm font-medium w-24">เวลาที่ดี:</div>
+                                    <div class="text-gray-700 text-sm">Blank Gameweek (BGW) ครั้งใหญ่ที่สุด</div>
+                                </div>
+                                <div class="flex items-start">
+                                    <div class="text-blue-600 text-sm font-medium w-24">เหตุผล:</div>
+                                    <div class="text-gray-700 text-sm">เพื่อแก้ปัญหาผู้เล่นในทีมไม่มีโปรแกรมการแข่งขันโดยไม่กระทบแผนระยะยาว</div>
+                                </div>
+                                <div class="flex items-start">
+                                    <div class="text-blue-600 text-sm font-medium w-24">กลยุทธ์รอง:</div>
+                                    <div class="text-gray-700 text-sm">ใช้ใน DGW หากทีมปัจจุบันไม่มีผู้เล่นที่ลงเตะ 2 นัดเลย</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                            <div class="flex items-center mb-2">
+                                <div class="text-green-600 text-xl mr-2">✅</div>
+                                <div class="text-green-800 font-medium">ข้อดี:</div>
+                            </div>
+                            <p class="text-green-800 text-sm">หลังจากใช้แล้ว ทีมจะกลับไปเป็นแบบเดิมทันที ไม่ต้องกังวลเรื่องการวางแผนระยะยาว</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Strategy Timeline -->
+        <div class="bg-white rounded-xl shadow-lg p-8 mb-12">
+            <h2 class="text-3xl font-bold text-gray-900 text-center mb-8">📅 ยุทธศาสตร์การใช้ Chip ตามช่วงเวลา</h2>
+            
+            <div class="space-y-8">
+                <!-- Early Season -->
+                <div class="flex items-start">
+                    <div class="flex-shrink-0 w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mr-6">
+                        <span class="text-2xl">🌱</span>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="text-xl font-semibold text-gray-900 mb-2">GW 1-10: ช่วงต้นฤดูกาล</h3>
+                        <p class="text-gray-700 mb-3">เฝ้าดูฟอร์มผู้เล่นและทีม รอจังหวะที่เหมาะสมในการใช้ Wildcard ครั้งแรก</p>
+                        <div class="bg-green-50 border border-green-200 rounded-lg p-3">
+                            <p class="text-green-800 text-sm"><strong>แนะนำ:</strong> Wildcard ครั้งที่ 1 ใน GW 4-8 หากต้องการปรับทีมใหญ่</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mid Season -->
+                <div class="flex items-start">
+                    <div class="flex-shrink-0 w-24 h-24 bg-yellow-100 rounded-full flex items-center justify-center mr-6">
+                        <span class="text-2xl">⚡</span>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="text-xl font-semibold text-gray-900 mb-2">GW 11-25: ช่วงกลางฤดูกาล</h3>
+                        <p class="text-gray-700 mb-3">เก็บ Chip ไว้ เน้นการใช้ Free Transfer อย่างชาญฉลาด วางแผนสำหรับช่วงท้ายฤดูกาล</p>
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                            <p class="text-yellow-800 text-sm"><strong>กลยุทธ์:</strong> ศึกษาปฏิทินการแข่งขัน เตรียมพร้อมสำหรับ DGW/BGW</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Late Season -->
+                <div class="flex items-start">
+                    <div class="flex-shrink-0 w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mr-6">
+                        <span class="text-2xl">🚀</span>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="text-xl font-semibold text-gray-900 mb-2">GW 26-38: ช่วงท้ายฤดูกาล</h3>
+                        <p class="text-gray-700 mb-3">เวลาแห่งการใช้ Chip! DGW และ BGW มักเกิดขึ้นในช่วงนี้</p>
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-3 space-y-2">
+                            <p class="text-red-800 text-sm"><strong>ลำดับแนะนำ:</strong></p>
+                            <ol class="text-red-800 text-sm list-decimal list-inside space-y-1">
+                                <li>Wildcard ก่อน DGW ใหญ่ 1-2 สัปดาห์</li>
+                                <li>Bench Boost ใน DGW ใหญ่ที่สุด</li>
+                                <li>Triple Captain กับผู้เล่นดาวใน DGW ฟอร์มดี</li>
+                                <li>Free Hit ใน BGW ที่มีทีมเล่นน้อยที่สุด</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pro Tips -->
+        <div class="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl shadow-lg p-8">
+            <h2 class="text-3xl font-bold text-white text-center mb-8">💎 เทคนิคขั้นสูงสำหรับมืออาชีพ</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-white bg-opacity-10 rounded-lg p-6 backdrop-blur-sm">
+                    <div class="flex items-center mb-4">
+                        <span class="text-3xl mr-3">🎯</span>
+                        <h3 class="text-xl font-semibold text-white">การวางแผนล่วงหน้า</h3>
+                    </div>
+                    <ul class="text-white text-opacity-90 space-y-2">
+                        <li>• ศึกษาปฏิทิน DGW/BGW ตั้งแต่ต้นฤดูกาล</li>
+                        <li>• เก็บ Chip ไว้สำหรับช่วงที่มีศักยภาพสูงสุด</li>
+                        <li>• อย่าใช้ Chip เพียงเพราะมีอยู่</li>
+                    </ul>
+                </div>
+
+                <div class="bg-white bg-opacity-10 rounded-lg p-6 backdrop-blur-sm">
+                    <div class="flex items-center mb-4">
+                        <span class="text-3xl mr-3">⚖️</span>
+                        <h3 class="text-xl font-semibold text-white">การประเมินความเสี่ยง</h3>
+                    </div>
+                    <ul class="text-white text-opacity-90 space-y-2">
+                        <li>• Triple Captain: เลือกผู้เล่นที่แน่ใจว่าจะลงเล่น</li>
+                        <li>• Bench Boost: ต้องมีผู้เล่นสำรอง 4 คนที่มีคุณภาพ</li>
+                        <li>• Free Hit: ใช้เมื่อทีมปัจจุบันมีปัญหาจริงๆ</li>
+                    </ul>
+                </div>
+
+                <div class="bg-white bg-opacity-10 rounded-lg p-6 backdrop-blur-sm">
+                    <div class="flex items-center mb-4">
+                        <span class="text-3xl mr-3">📊</span>
+                        <h3 class="text-xl font-semibold text-white">การวิเคราะห์ข้อมูล</h3>
+                    </div>
+                    <ul class="text-white text-opacity-90 space-y-2">
+                        <li>• ดูสถิติในอดีตของผู้เล่นใน DGW</li>
+                        <li>• พิจารณาคู่แข่งและสถานที่แข่ง</li>
+                        <li>• ติดตามข่าวการบาดเจ็บก่อนใช้ TC</li>
+                    </ul>
+                </div>
+
+                <div class="bg-white bg-opacity-10 rounded-lg p-6 backdrop-blur-sm">
+                    <div class="flex items-center mb-4">
+                        <span class="text-3xl mr-3">🏆</span>
+                        <h3 class="text-xl font-semibold text-white">จิตวิทยาการแข่งขัน</h3>
+                    </div>
+                    <ul class="text-white text-opacity-90 space-y-2">
+                        <li>• ไม่ต้องเร่งใช้ Chip เพราะคนอื่นใช้</li>
+                        <li>• มั่นใจในการตัดสินใจของตัวเอง</li>
+                        <li>• เรียนรู้จากความผิดพลาดในอดีต</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
