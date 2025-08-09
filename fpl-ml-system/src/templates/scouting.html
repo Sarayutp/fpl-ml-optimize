@@ -351,7 +351,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         try {
             const searchParams = {
-                name: document.getElementById('playerSearch').value.trim(),
+                q: document.getElementById('playerSearch').value.trim(),
                 position: document.getElementById('positionFilter').value,
                 team_id: document.getElementById('teamFilter').value ? parseInt(document.getElementById('teamFilter').value) : null,
                 min_cost: document.getElementById('minPrice').value ? parseFloat(document.getElementById('minPrice').value) : null,
@@ -624,8 +624,25 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Global functions for button clicks
     window.viewPlayerDetail = function(playerId) {
-        // Implementation for player detail view
-        console.log('View player detail:', playerId);
+        // Find player data
+        const player = currentData.find(p => p.player_id === playerId);
+        if (!player) {
+            alert('ไม่พบข้อมูลผู้เล่น');
+            return;
+        }
+        
+        // Show player detail modal or alert
+        const detailInfo = `
+รายละเอียดผู้เล่น: ${player.web_name}
+ทีม: ${player.team_name}
+ตำแหน่ง: ${getPositionName(player.position)}
+ราคา: £${player.now_cost.toFixed(1)}M
+คะแนนรวม: ${player.total_points}
+ฟอร์ม: ${player.form.toFixed(1)}
+คะแนนคาดหวัง: ${player.expected_points ? player.expected_points.toFixed(1) : 'N/A'}
+        `;
+        
+        alert(detailInfo);
     };
 
     window.addToComparison = function(playerId) {
