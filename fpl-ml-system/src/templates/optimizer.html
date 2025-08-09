@@ -51,6 +51,59 @@
                         </select>
                     </div>
 
+                    <!-- Gameweek Selection -->
+                    <div>
+                        <label for="gameweek" class="block text-sm font-medium text-gray-700 mb-2">
+                            เกมวีคเป้าหมาย (เลือกได้)
+                        </label>
+                        <select id="gameweek" 
+                                name="gameweek" 
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">ทั่วไป (ไม่พิจารณาตารางแข่งขัน)</option>
+                            <option value="1">เกมวีคที่ 1</option>
+                            <option value="2">เกมวีคที่ 2</option>
+                            <option value="3">เกมวีคที่ 3</option>
+                            <option value="4">เกมวีคที่ 4</option>
+                            <option value="5">เกมวีคที่ 5</option>
+                            <option value="6">เกมวีคที่ 6</option>
+                            <option value="7">เกมวีคที่ 7</option>
+                            <option value="8">เกมวีคที่ 8</option>
+                            <option value="9">เกมวีคที่ 9</option>
+                            <option value="10">เกมวีคที่ 10</option>
+                            <option value="11">เกมวีคที่ 11</option>
+                            <option value="12">เกมวีคที่ 12</option>
+                            <option value="13">เกมวีคที่ 13</option>
+                            <option value="14">เกมวีคที่ 14</option>
+                            <option value="15">เกมวีคที่ 15</option>
+                            <option value="16">เกมวีคที่ 16</option>
+                            <option value="17">เกมวีคที่ 17</option>
+                            <option value="18">เกมวีคที่ 18</option>
+                            <option value="19">เกมวีคที่ 19</option>
+                            <option value="20">เกมวีคที่ 20</option>
+                            <option value="21">เกมวีคที่ 21</option>
+                            <option value="22">เกมวีคที่ 22</option>
+                            <option value="23">เกมวีคที่ 23</option>
+                            <option value="24">เกมวีคที่ 24</option>
+                            <option value="25">เกมวีคที่ 25</option>
+                            <option value="26">เกมวีคที่ 26</option>
+                            <option value="27">เกมวีคที่ 27</option>
+                            <option value="28">เกมวีคที่ 28</option>
+                            <option value="29">เกมวีคที่ 29</option>
+                            <option value="30">เกมวีคที่ 30</option>
+                            <option value="31">เกมวีคที่ 31</option>
+                            <option value="32">เกมวีคที่ 32</option>
+                            <option value="33">เกมวีคที่ 33</option>
+                            <option value="34">เกมวีคที่ 34</option>
+                            <option value="35">เกมวีคที่ 35</option>
+                            <option value="36">เกมวีคที่ 36</option>
+                            <option value="37">เกมวีคที่ 37</option>
+                            <option value="38">เกมวีคที่ 38</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">
+                            เลือกเกมวีคเพื่อพิจารณาตารางแข่งขันและ FDR ในการจัดทีม
+                        </p>
+                    </div>
+
                     <!-- Max Players Per Team -->
                     <div>
                         <label for="maxPlayersPerTeam" class="block text-sm font-medium text-gray-700 mb-2">
@@ -190,6 +243,36 @@
                                 <p class="text-lg font-bold text-yellow-600" id="captainPoints"></p>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- Fixture Analysis (if gameweek selected) -->
+                    <div id="fixtureAnalysis" class="bg-green-50 border border-green-200 rounded-lg p-4 mb-6 hidden">
+                        <h3 class="font-semibold text-gray-900 mb-3">🏟️ การวิเคราะห์ตารางแข่งขัน</h3>
+                        <div class="grid grid-cols-2 gap-4 mb-4">
+                            <div class="text-center">
+                                <p class="text-xs text-gray-500 mb-1">ความยากเฉลี่ย (FDR)</p>
+                                <p class="text-lg font-bold" id="avgFixtureDifficulty">-</p>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-xs text-gray-500 mb-1">แข่งในบ้าน</p>
+                                <p class="text-lg font-bold text-green-600" id="homePlayersCount">-</p>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 text-xs">
+                            <div class="text-center bg-green-100 py-2 rounded">
+                                <p class="text-green-800 font-semibold" id="easyFixturesCount">0</p>
+                                <p class="text-green-600">คู่ง่าย</p>
+                            </div>
+                            <div class="text-center bg-yellow-100 py-2 rounded">
+                                <p class="text-yellow-800 font-semibold" id="normalFixturesCount">0</p>
+                                <p class="text-yellow-600">คู่ปกติ</p>
+                            </div>
+                            <div class="text-center bg-red-100 py-2 rounded">
+                                <p class="text-red-800 font-semibold" id="hardFixturesCount">0</p>
+                                <p class="text-red-600">คู่ยาก</p>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-3 text-center" id="gameweekInfo">สำหรับเกมวีคที่เลือก</p>
                     </div>
 
                     <!-- AI Reasoning -->
@@ -398,6 +481,9 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Update reasoning
         document.getElementById('reasoningText').textContent = data.reasoning || 'ไม่มีคำอธิบาย';
+        
+        // Update fixture analysis (if available)
+        updateFixtureAnalysis(data);
         
         // Generate formation display (from Starting XI only)
         generateFormationDisplay(data.players_by_position);
@@ -660,6 +746,38 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         benchLists.innerHTML = html;
+    }
+
+    function updateFixtureAnalysis(data) {
+        const fixtureAnalysisDiv = document.getElementById('fixtureAnalysis');
+        
+        // Show/hide fixture analysis based on whether gameweek and fixture_analysis exist
+        if (data.gameweek && data.fixture_analysis) {
+            const analysis = data.fixture_analysis;
+            
+            // Update all the fixture analysis elements
+            document.getElementById('avgFixtureDifficulty').textContent = analysis.average_fixture_difficulty || '-';
+            document.getElementById('homePlayersCount').textContent = analysis.home_players || '0';
+            document.getElementById('easyFixturesCount').textContent = analysis.easy_fixtures || '0';
+            document.getElementById('normalFixturesCount').textContent = (analysis.total_fixtures || 0) - (analysis.easy_fixtures || 0) - (analysis.hard_fixtures || 0);
+            document.getElementById('hardFixturesCount').textContent = analysis.hard_fixtures || '0';
+            document.getElementById('gameweekInfo').textContent = `สำหรับเกมวีคที่ ${data.gameweek}`;
+            
+            // Color the average difficulty based on value
+            const avgDiffElement = document.getElementById('avgFixtureDifficulty');
+            const avgDiff = parseFloat(analysis.average_fixture_difficulty || 0);
+            if (avgDiff <= 2.5) {
+                avgDiffElement.className = 'text-lg font-bold text-green-600';
+            } else if (avgDiff <= 3.5) {
+                avgDiffElement.className = 'text-lg font-bold text-yellow-600';
+            } else {
+                avgDiffElement.className = 'text-lg font-bold text-red-600';
+            }
+            
+            fixtureAnalysisDiv.classList.remove('hidden');
+        } else {
+            fixtureAnalysisDiv.classList.add('hidden');
+        }
     }
 
     // Initialize with default state

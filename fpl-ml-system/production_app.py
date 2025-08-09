@@ -311,18 +311,55 @@ def create_production_app():
             except (ValueError, TypeError):
                 max_players_per_team = 3
             
-            print(f"🔍 [DEBUG] Processed data - Budget: {budget} ({type(budget)}), Formation: {formation}, Max per team: {max_players_per_team} ({type(max_players_per_team)})")
+            gameweek_raw = request_data.get('gameweek')
+            gameweek = None
+            if gameweek_raw and str(gameweek_raw).strip():
+                try:
+                    gameweek = int(gameweek_raw)
+                    if gameweek < 1 or gameweek > 38:
+                        gameweek = None
+                except (ValueError, TypeError):
+                    gameweek = None
+            
+            print(f"🔍 [DEBUG] Processed data - Budget: {budget} ({type(budget)}), Formation: {formation}, Max per team: {max_players_per_team} ({type(max_players_per_team)}), Gameweek: {gameweek}")
             print(f"🔍 [DEBUG] Preferred IDs: {preferred_player_ids}, Excluded IDs: {excluded_player_ids}")
             
             # Perform optimization with error tracking
             print("🤖 [DEBUG] Calling optimization service...")
-            result = app.optimization_service.optimize_team(
-                budget=budget,
-                formation=formation,
-                preferred_players=preferred_player_ids,
-                excluded_players=excluded_player_ids,
-                max_players_per_team=max_players_per_team
-            )
+            
+            if gameweek:
+                print(f"🏟️ [DEBUG] Using gameweek optimization for GW{gameweek}")
+                # Use gameweek-specific optimization that considers fixtures and FDR
+                result = app.optimization_service.optimize_for_gameweek(
+                    gameweek=gameweek,
+                    budget=budget
+                )
+                # Apply additional constraints if needed
+                if formation or preferred_player_ids or excluded_player_ids or max_players_per_team != 3:
+                    print("⚠️ [DEBUG] Gameweek optimization doesn't support all constraints, falling back to regular optimization")
+                    result = app.optimization_service.optimize_team(
+                        budget=budget,
+                        formation=formation,
+                        preferred_players=preferred_player_ids,
+                        excluded_players=excluded_player_ids,
+                        max_players_per_team=max_players_per_team
+                    )
+                    # Add gameweek context to regular optimization
+                    if 'fixture_analysis' not in result:
+                        fixture_context = app.optimization_service._get_gameweek_fixture_context(gameweek)
+                        result['fixture_analysis'] = app.optimization_service._analyze_fixture_difficulty(
+                            result.get('players', []), fixture_context
+                        )
+                        result['gameweek'] = gameweek
+            else:
+                print("📊 [DEBUG] Using regular optimization (no gameweek specified)")
+                result = app.optimization_service.optimize_team(
+                    budget=budget,
+                    formation=formation,
+                    preferred_players=preferred_player_ids,
+                    excluded_players=excluded_player_ids,
+                    max_players_per_team=max_players_per_team
+                )
             
             print(f"✅ [DEBUG] Optimization completed: {len(result.get('players', []))} players")
             
