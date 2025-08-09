@@ -102,14 +102,14 @@ class OptimizationService:
                     players_selected[pid] for pid in team_players
                 ]) <= max_players_per_team
             
-            # Preferred players constraint (soft constraint with bonus)
+            # Preferred players constraint (hard constraint - must include)
             if preferred_players:
-                preferred_bonus = LpVariable.dicts("preferred_bonus", preferred_players, cat='Binary')
+                logger.info(f"Adding preferred players constraint: {preferred_players}")
                 for pid in preferred_players:
                     if pid in players_selected:
-                        prob += preferred_bonus[pid] <= players_selected[pid]
-                        # Add bonus points for preferred players
-                        prob += 0.1 * preferred_bonus[pid]  # Small bonus
+                        # Force selection of preferred players
+                        prob += players_selected[pid] == 1
+                        logger.info(f"Forced selection of preferred player ID: {pid}")
             
             # Transfer constraints if optimizing existing team
             if existing_team and transfer_limit > 0:

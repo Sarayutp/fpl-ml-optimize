@@ -176,22 +176,59 @@ def create_production_app():
                 formation = None
                 
             preferred_players = request_data.get('preferred_players')
+            preferred_player_ids = None
             if isinstance(preferred_players, str):
-                if preferred_players.strip() == "":
-                    preferred_players = None
-                else:
-                    preferred_players = [p.strip() for p in preferred_players.split(',') if p.strip()]
-            elif not preferred_players:
-                preferred_players = None
+                if preferred_players.strip() != "":
+                    player_names = [p.strip() for p in preferred_players.split(',') if p.strip()]
+                    # Convert player names to IDs
+                    preferred_player_ids = []
+                    for name in player_names:
+                        player = Player.query.filter(
+                            db.or_(
+                                Player.web_name.ilike(f'%{name}%'),
+                                Player.first_name.ilike(f'%{name}%'),
+                                Player.second_name.ilike(f'%{name}%')
+                            )
+                        ).filter(Player.status == 'a').first()
+                        
+                        if player:
+                            preferred_player_ids.append(player.player_id)
+                            print(f"🔍 [DEBUG] Found preferred player: {name} -> {player.web_name} (ID: {player.player_id})")
+                        else:
+                            print(f"⚠️ [DEBUG] Preferred player not found: {name}")
+                    
+                    if not preferred_player_ids:
+                        preferred_player_ids = None
+                        print("⚠️ [DEBUG] No preferred players found from names")
+            elif isinstance(preferred_players, list) and preferred_players:
+                preferred_player_ids = preferred_players
                 
             excluded_players = request_data.get('excluded_players')
+            excluded_player_ids = None
             if isinstance(excluded_players, str):
-                if excluded_players.strip() == "":
-                    excluded_players = None
-                else:
-                    excluded_players = [p.strip() for p in excluded_players.split(',') if p.strip()]
-            elif not excluded_players:
-                excluded_players = None
+                if excluded_players.strip() != "":
+                    player_names = [p.strip() for p in excluded_players.split(',') if p.strip()]
+                    # Convert player names to IDs
+                    excluded_player_ids = []
+                    for name in player_names:
+                        player = Player.query.filter(
+                            db.or_(
+                                Player.web_name.ilike(f'%{name}%'),
+                                Player.first_name.ilike(f'%{name}%'),
+                                Player.second_name.ilike(f'%{name}%')
+                            )
+                        ).filter(Player.status == 'a').first()
+                        
+                        if player:
+                            excluded_player_ids.append(player.player_id)
+                            print(f"🔍 [DEBUG] Found excluded player: {name} -> {player.web_name} (ID: {player.player_id})")
+                        else:
+                            print(f"⚠️ [DEBUG] Excluded player not found: {name}")
+                    
+                    if not excluded_player_ids:
+                        excluded_player_ids = None
+            elif isinstance(excluded_players, list) and excluded_players:
+                excluded_player_ids = excluded_players
                 
             max_players_raw = request_data.get('max_players_per_team', 3)
             try:
@@ -200,15 +237,15 @@ def create_production_app():
                 max_players_per_team = 3
             
             print(f"🔍 [DEBUG] Processed data - Budget: {budget} ({type(budget)}), Formation: {formation}, Max per team: {max_players_per_team} ({type(max_players_per_team)})")
-            print(f"🔍 [DEBUG] Preferred: {preferred_players}, Excluded: {excluded_players}")
+            print(f"🔍 [DEBUG] Preferred IDs: {preferred_player_ids}, Excluded IDs: {excluded_player_ids}")
             
             # Perform optimization with error tracking
             print("🤖 [DEBUG] Calling optimization service...")
             result = app.optimization_service.optimize_team(
                 budget=budget,
                 formation=formation,
-                preferred_players=preferred_players,
-                excluded_players=excluded_players,
+                preferred_players=preferred_player_ids,
+                excluded_players=excluded_player_ids,
                 max_players_per_team=max_players_per_team
             )
             
