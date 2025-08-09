@@ -151,7 +151,7 @@ class OptimizationService:
             
             # Select Starting XI from the 15-player squad based on formation
             starting_xi = self._select_starting_xi(
-                selected_players, formation, player_predictions, player_positions
+                selected_players, formation, player_predictions, player_positions, preferred_players
             )
             
             # Select captain and vice-captain from Starting XI (highest expected points)
@@ -253,23 +253,67 @@ class OptimizationService:
         return player_data
     
     def _estimate_expected_points(self, player_row) -> float:
-        """Estimate expected points when prediction is not available."""
-        # Simple heuristic based on position and cost
-        base_points = {
-            'GKP': 2.0,
-            'DEF': 2.5,
-            'MID': 3.0,
-            'FWD': 3.5
-        }
+        """Estimate expected points when prediction is not available using realistic FPL scoring."""
+        from ..models.db_models import Player
         
-        position_base = base_points.get(player_row.position, 2.0)
-        cost_factor = (player_row.now_cost / 10.0) / 5.0  # Normalize by £5M
+        # Get the actual player object to access form and total_points
+        player = Player.query.get(player_row.player_id)
+        if not player:
+            return 2.0
+            
+        # Base points by position (realistic FPL averages)
+        position_base = {
+            'GKP': 4.0,  # Keepers get clean sheet points
+            'DEF': 4.5,  # Defenders get clean sheet + attacking returns  
+            'MID': 5.5,  # Midfielders get goals/assists
+            'FWD': 6.0   # Forwards get most goals
+        }.get(player.position, 4.0)
         
-        return max(0.5, position_base * (1 + cost_factor * 0.5))
+        # Form factor (recent performance)
+        form_score = float(player.form or 0)
+        if form_score > 7.0:
+            form_multiplier = 1.4  # Excellent form
+        elif form_score > 5.0:
+            form_multiplier = 1.2  # Good form  
+        elif form_score > 3.0:
+            form_multiplier = 1.0  # Average form
+        else:
+            form_multiplier = 0.7  # Poor form
+            
+        # Total points factor (season performance)
+        total_points = player.total_points or 0
+        if total_points > 200:
+            points_multiplier = 1.5  # Elite performers
+        elif total_points > 150:
+            points_multiplier = 1.3  # Very good
+        elif total_points > 100:
+            points_multiplier = 1.1  # Good
+        elif total_points > 50:
+            points_multiplier = 0.9  # Average
+        else:
+            points_multiplier = 0.6  # Poor/new players
+            
+        # Cost factor (expensive players should deliver more)
+        cost = player.now_cost / 10.0  # Convert to millions
+        if cost >= 12.0:
+            cost_multiplier = 1.3  # Premium players
+        elif cost >= 8.0:
+            cost_multiplier = 1.1  # Mid-price
+        elif cost >= 5.0:
+            cost_multiplier = 1.0  # Budget
+        else:
+            cost_multiplier = 0.8  # Cheap players
+            
+        # Calculate final expected points
+        expected = position_base * form_multiplier * points_multiplier * cost_multiplier
+        
+        # Ensure reasonable range (1-15 points per gameweek)
+        return max(1.0, min(15.0, round(expected, 1)))
     
     def _select_starting_xi(self, squad_players: List[int], formation: Optional[str], 
                            player_predictions: Dict[int, float], 
-                           player_positions: Dict[int, str]) -> List[int]:
+                           player_positions: Dict[int, str], 
+                           preferred_players: Optional[List[int]] = None) -> List[int]:
         """Select the best 11 players from 15-player squad based on formation."""
         
         # Parse formation or use default
@@ -297,10 +341,17 @@ class OptimizationService:
             position = player_positions[player_id]
             players_by_position[position].append(player_id)
         
-        # Sort each position by expected points (descending)
+        # Sort each position by expected points, but prioritize preferred players
         for position in players_by_position:
+            def sort_key(pid):
+                base_score = player_predictions[pid]
+                # Add huge bonus to preferred players to ensure they're selected first
+                if preferred_players and pid in preferred_players:
+                    return base_score + 100.0  # Very high bonus
+                return base_score
+                
             players_by_position[position].sort(
-                key=lambda pid: player_predictions[pid], 
+                key=sort_key, 
                 reverse=True
             )
         

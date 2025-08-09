@@ -35,6 +35,63 @@ def add_cors_headers(response):
     response.headers.add('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
     return response
 
+def _calculate_realistic_expected_points(player) -> float:
+    """Calculate realistic expected points based on multiple factors."""
+    # Base points by position (realistic FPL averages per gameweek)
+    position_base = {
+        'GKP': 4.0,  # Keepers: 2 saves + potential clean sheet
+        'DEF': 4.5,  # Defenders: 2 appearance + clean sheet bonus
+        'MID': 5.5,  # Midfielders: 2 appearance + goals/assists
+        'FWD': 6.0   # Forwards: 2 appearance + goals 
+    }.get(player.position, 4.0)
+    
+    # Form factor (recent 5 games average)
+    form_score = float(player.form or 0)
+    if form_score >= 8.0:
+        form_multiplier = 1.5  # Excellent form (8+ avg)
+    elif form_score >= 6.0:
+        form_multiplier = 1.3  # Very good form (6-8 avg)
+    elif form_score >= 4.0:
+        form_multiplier = 1.1  # Good form (4-6 avg)
+    elif form_score >= 2.0:
+        form_multiplier = 0.9  # Average form (2-4 avg)
+    else:
+        form_multiplier = 0.6  # Poor form (<2 avg)
+        
+    # Season performance factor
+    total_points = player.total_points or 0
+    if total_points >= 250:
+        points_multiplier = 1.6  # Elite (250+ points)
+    elif total_points >= 200:
+        points_multiplier = 1.4  # Excellent (200-250)
+    elif total_points >= 150:
+        points_multiplier = 1.2  # Very good (150-200)
+    elif total_points >= 100:
+        points_multiplier = 1.0  # Good (100-150)
+    elif total_points >= 50:
+        points_multiplier = 0.8  # Average (50-100)
+    else:
+        points_multiplier = 0.5  # Poor/New (<50)
+        
+    # Price factor (expensive players expected to deliver)
+    cost = player.now_cost / 10.0
+    if cost >= 13.0:
+        cost_multiplier = 1.4  # Premium (£13M+)
+    elif cost >= 10.0:
+        cost_multiplier = 1.2  # Expensive (£10-13M)
+    elif cost >= 7.0:
+        cost_multiplier = 1.0  # Mid-price (£7-10M)
+    elif cost >= 5.0:
+        cost_multiplier = 0.9  # Budget (£5-7M)
+    else:
+        cost_multiplier = 0.7  # Cheap (£5M-)
+        
+    # Calculate expected points
+    expected = position_base * form_multiplier * points_multiplier * cost_multiplier
+    
+    # Realistic range: 1-12 points per gameweek  
+    return max(1.0, min(12.0, round(expected, 1)))
+
 def create_production_app():
     """Create production Flask app without ML dependencies."""
     app = Flask(__name__, 
@@ -286,7 +343,7 @@ def create_production_app():
                             'now_cost': player.now_cost / 10.0,
                             'total_points': player.total_points,
                             'form': float(player.form or 0),
-                            'expected_points': max(2.0, float(player.form or 0) * 2),
+                            'expected_points': _calculate_realistic_expected_points(player),
                             'is_captain': is_captain,
                             'is_vice_captain': is_vice_captain,
                             'is_starting': is_starting
@@ -524,7 +581,7 @@ def create_production_app():
                     'now_cost': player.now_cost / 10.0,
                     'total_points': player.total_points,
                     'form': float(player.form or 0),
-                    'expected_points': max(2.0, float(player.form or 0) * 2),  # Simple estimation
+                    'expected_points': _calculate_realistic_expected_points(player),
                     'status': player.status,
                     'selected_by_percent': getattr(player, 'selected_by_percent', 0.0),
                     'transfers_in': getattr(player, 'transfers_in', 0),
